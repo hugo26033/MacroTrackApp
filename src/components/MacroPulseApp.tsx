@@ -97,6 +97,7 @@ export function MacroPulseApp() {
 
   // Modals & UI toggles
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState<string>("");
   const [showMicronutrients, setShowMicronutrients] = useState(false);
   const [showFullJournal, setShowFullJournal] = useState(false);
   const [expandedMeals, setExpandedMeals] = useState<Record<MealSlot, boolean>>({
@@ -111,8 +112,10 @@ export function MacroPulseApp() {
   const [quickAddSlot, setQuickAddSlot] = useState<MealSlot>("lunch");
 
   useEffect(() => {
+    const today = todayISO();
     setState(loadAppState());
-    setSelectedDate(todayISO());
+    setSelectedDate(today);
+    setCalendarMonth(today.slice(0, 7));
     setHydrated(true);
 
     if ("serviceWorker" in navigator) {
@@ -393,46 +396,116 @@ export function MacroPulseApp() {
           </div>
         </div>
 
-        {/* Date Picker Drawer */}
-        {activeTab === "today" && datePickerOpen && (
-          <div className="max-w-xl mx-auto px-4 pb-3">
-            <div className={`rounded-2xl border p-2.5 flex items-center justify-between gap-2 ${cardSurface}`}>
-              <button
-                type="button"
-                onClick={() => shiftDate(-1)}
-                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium"
-              >
-                ← Préc.
-              </button>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value);
-                  setDatePickerOpen(false);
-                }}
-                className="bg-transparent text-xs font-mono focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedDate(todayISO());
-                  setDatePickerOpen(false);
-                }}
-                className="px-3 py-1.5 rounded-xl bg-blue-500/15 text-blue-400 text-xs font-medium"
-              >
-                Aujourd&apos;hui
-              </button>
-              <button
-                type="button"
-                onClick={() => shiftDate(1)}
-                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium"
-              >
-                Suiv. →
-              </button>
+        {/* Date Picker Calendar Drawer */}
+        {activeTab === "today" && datePickerOpen && calendarMonth && (() => {
+          const [yearStr, monthStr] = calendarMonth.split("-");
+          const year = Number(yearStr);
+          const month = Number(monthStr); // 1..12
+          const firstDay = new Date(year, month - 1, 1);
+          const startWeekday = (firstDay.getDay() + 6) % 7; // 0=Mon..6=Sun
+          const daysInMonth = new Date(year, month, 0).getDate();
+          const todayStr = todayISO();
+          const monthLabel = firstDay.toLocaleDateString("fr-FR", {
+            month: "long",
+            year: "numeric",
+          });
+
+          const shiftCalMonth = (delta: number) => {
+            const d = new Date(year, month - 1 + delta, 1);
+            setCalendarMonth(
+              `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+            );
+          };
+
+          const cells: Array<{ day: number; iso: string } | null> = [];
+          for (let i = 0; i < startWeekday; i++) cells.push(null);
+          for (let d = 1; d <= daysInMonth; d++) {
+            cells.push({
+              day: d,
+              iso: `${yearStr}-${monthStr}-${String(d).padStart(2, "0")}`,
+            });
+          }
+
+          return (
+            <div className="max-w-xl mx-auto px-4 pb-3">
+              <div className={`rounded-2xl border p-3.5 space-y-3 ${cardSurface}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => shiftCalMonth(-1)}
+                    className="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium"
+                  >
+                    ←
+                  </button>
+                  <span className="text-sm font-semibold capitalize">{monthLabel}</span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDate(todayStr);
+                        setCalendarMonth(todayStr.slice(0, 7));
+                        setDatePickerOpen(false);
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl bg-blue-500/15 text-blue-400 text-xs font-medium"
+                    >
+                      Aujourd&apos;hui
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => shiftCalMonth(1)}
+                      className="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium"
+                    >
+                      →
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-zinc-500 font-medium">
+                  {["L", "M", "M", "J", "V", "S", "D"].map((lbl, i) => (
+                    <div key={i} className="py-1">
+                      {lbl}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-7 gap-1 text-center">
+                  {cells.map((cell, idx) => {
+                    if (!cell) return <div key={`empty-${idx}`} />;
+                    const isSelected = cell.iso === selectedDate;
+                    const isToday = cell.iso === todayStr;
+                    const hasLogs = loggedDatesSet.has(cell.iso);
+                    return (
+                      <button
+                        key={cell.iso}
+                        type="button"
+                        onClick={() => {
+                          setSelectedDate(cell.iso);
+                          setDatePickerOpen(false);
+                        }}
+                        className={`relative h-9 rounded-xl text-xs font-medium flex flex-col items-center justify-center transition ${
+                          isSelected
+                            ? "bg-blue-500 text-white font-semibold"
+                            : isToday
+                              ? "ring-1 ring-blue-400 text-blue-400 hover:bg-white/5"
+                              : "hover:bg-white/5 text-zinc-200"
+                        }`}
+                      >
+                        <span>{cell.day}</span>
+                        {hasLogs && (
+                          <span
+                            className={`w-1 h-1 rounded-full mt-0.5 ${
+                              isSelected ? "bg-white" : "bg-emerald-400"
+                            }`}
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </header>
 
       {/* Main Content */}
