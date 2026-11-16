@@ -20,6 +20,7 @@ import {
   TrashIcon,
   XIcon,
 } from "./Icons";
+import { NumberInput } from "./NumberInput";
 
 export type QuickAddTabMode = "all" | "recipes" | "foods" | "barcode" | "photo" | "text" | "manual";
 
@@ -764,11 +765,10 @@ export function QuickAddModal({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <label className="text-xs text-zinc-400">Quantité (g) :</label>
-                    <input
-                      type="number"
+                    <NumberInput
                       min={1}
                       value={selectedFoodQtyG}
-                      onChange={(e) => setSelectedFoodQtyG(Math.max(1, Number(e.target.value)))}
+                      onValueChange={setSelectedFoodQtyG}
                       className="w-24 rounded-xl bg-[#0f131d] border border-white/10 px-2.5 py-1.5 text-sm font-mono text-zinc-100 focus:outline-none focus:border-blue-500"
                     />
                   </div>
@@ -1077,11 +1077,10 @@ export function QuickAddModal({
 
                 <div className="flex items-center gap-3">
                   <label className="text-xs text-zinc-400">Quantité (g) :</label>
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     value={productQtyG}
-                    onChange={(e) => setProductQtyG(Math.max(1, Number(e.target.value)))}
+                    onValueChange={setProductQtyG}
                     className="w-24 rounded-xl bg-zinc-900 border border-zinc-700 px-2.5 py-1.5 text-sm font-mono"
                   />
                 </div>
@@ -1228,48 +1227,51 @@ export function QuickAddModal({
                     <div className="grid grid-cols-5 gap-1.5 text-xs">
                       <label className="space-y-0.5">
                         <span className="text-[10px] text-zinc-500">Grammes</span>
-                        <input
-                          type="number"
+                        <NumberInput
+                          min={1}
                           value={item.estimatedGrams}
-                          onChange={(e) =>
-                            updateAiItem(idx, { estimatedGrams: Number(e.target.value) })
+                          onValueChange={(val) =>
+                            updateAiItem(idx, { estimatedGrams: val })
                           }
                           className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-2 py-1 font-mono"
                         />
                       </label>
                       <label className="space-y-0.5">
                         <span className="text-[10px] text-zinc-500">Kcal</span>
-                        <input
-                          type="number"
+                        <NumberInput
+                          min={0}
                           value={item.kcal}
-                          onChange={(e) => updateAiItem(idx, { kcal: Number(e.target.value) })}
+                          onValueChange={(val) => updateAiItem(idx, { kcal: val })}
                           className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-2 py-1 font-mono text-emerald-400"
                         />
                       </label>
                       <label className="space-y-0.5">
                         <span className="text-[10px] text-zinc-500">Prot (g)</span>
-                        <input
-                          type="number"
+                        <NumberInput
+                          min={0}
+                          step="0.1"
                           value={item.proteinG}
-                          onChange={(e) => updateAiItem(idx, { proteinG: Number(e.target.value) })}
+                          onValueChange={(val) => updateAiItem(idx, { proteinG: val })}
                           className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-2 py-1 font-mono"
                         />
                       </label>
                       <label className="space-y-0.5">
                         <span className="text-[10px] text-zinc-500">Gluc (g)</span>
-                        <input
-                          type="number"
+                        <NumberInput
+                          min={0}
+                          step="0.1"
                           value={item.carbsG}
-                          onChange={(e) => updateAiItem(idx, { carbsG: Number(e.target.value) })}
+                          onValueChange={(val) => updateAiItem(idx, { carbsG: val })}
                           className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-2 py-1 font-mono"
                         />
                       </label>
                       <label className="space-y-0.5">
                         <span className="text-[10px] text-zinc-500">Lip (g)</span>
-                        <input
-                          type="number"
+                        <NumberInput
+                          min={0}
+                          step="0.1"
                           value={item.fatG}
-                          onChange={(e) => updateAiItem(idx, { fatG: Number(e.target.value) })}
+                          onValueChange={(val) => updateAiItem(idx, { fatG: val })}
                           className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-2 py-1 font-mono"
                         />
                       </label>
@@ -1354,59 +1356,59 @@ export function QuickAddModal({
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-xs">
                 <label className="space-y-1">
                   <span className="text-zinc-400">Qté (g)</span>
-                  <input
-                    type="number"
+                  <NumberInput
+                    min={1}
                     value={manualQty}
-                    onChange={(e) => setManualQty(Number(e.target.value))}
+                    onValueChange={setManualQty}
                     className="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-1.5 font-mono"
                   />
                 </label>
                 <label className="space-y-1">
                   <span className="text-zinc-400">Kcal</span>
-                  <input
-                    type="number"
+                  <NumberInput
+                    min={0}
                     value={manualKcal}
-                    onChange={(e) => setManualKcal(Number(e.target.value))}
+                    onValueChange={setManualKcal}
                     className="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-1.5 font-mono"
                   />
                 </label>
                 <label className="space-y-1">
                   <span className="text-zinc-400">Prot (g)</span>
-                  <input
-                    type="number"
+                  <NumberInput
+                    min={0}
                     step="0.1"
                     value={manualP}
-                    onChange={(e) => setManualP(Number(e.target.value))}
+                    onValueChange={setManualP}
                     className="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-1.5 font-mono"
                   />
                 </label>
                 <label className="space-y-1">
                   <span className="text-zinc-400">Gluc (g)</span>
-                  <input
-                    type="number"
+                  <NumberInput
+                    min={0}
                     step="0.1"
                     value={manualC}
-                    onChange={(e) => setManualC(Number(e.target.value))}
+                    onValueChange={setManualC}
                     className="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-1.5 font-mono"
                   />
                 </label>
                 <label className="space-y-1">
                   <span className="text-zinc-400">Lip (g)</span>
-                  <input
-                    type="number"
+                  <NumberInput
+                    min={0}
                     step="0.1"
                     value={manualF}
-                    onChange={(e) => setManualF(Number(e.target.value))}
+                    onValueChange={setManualF}
                     className="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-1.5 font-mono"
                   />
                 </label>
                 <label className="space-y-1">
                   <span className="text-zinc-400">Fibres</span>
-                  <input
-                    type="number"
+                  <NumberInput
+                    min={0}
                     step="0.1"
                     value={manualFiber}
-                    onChange={(e) => setManualFiber(Number(e.target.value))}
+                    onValueChange={setManualFiber}
                     className="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-1.5 font-mono"
                   />
                 </label>

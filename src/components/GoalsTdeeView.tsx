@@ -11,6 +11,7 @@ import {
   UserProfile,
   WeightEntry,
 } from "@/lib/types";
+import { NumberInput } from "./NumberInput";
 
 interface GoalsTdeeViewProps {
   profile: UserProfile;
@@ -121,19 +122,21 @@ export function GoalsTdeeView({
           </label>
           <label className="space-y-1 text-xs">
             <span className="text-zinc-400">Âge</span>
-            <input
-              type="number"
+            <NumberInput
+              min={10}
+              max={120}
               value={profile.age}
-              onChange={(e) => onUpdateProfile({ age: Number(e.target.value) })}
+              onValueChange={(age) => onUpdateProfile({ age })}
               className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-2.5 py-2 font-mono"
             />
           </label>
           <label className="space-y-1 text-xs">
             <span className="text-zinc-400">Taille (cm)</span>
-            <input
-              type="number"
+            <NumberInput
+              min={100}
+              max={250}
               value={profile.heightCm}
-              onChange={(e) => onUpdateProfile({ heightCm: Number(e.target.value) })}
+              onValueChange={(heightCm) => onUpdateProfile({ heightCm })}
               className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-2.5 py-2 font-mono"
             />
           </label>
@@ -304,57 +307,57 @@ export function GoalsTdeeView({
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
           <label className="space-y-1">
             <span className="text-zinc-400">Calories cibles (kcal)</span>
-            <input
-              type="number"
+            <NumberInput
+              min={500}
               value={goals.targetKcal}
-              onChange={(e) => onUpdateGoals({ targetKcal: Number(e.target.value) })}
+              onValueChange={(targetKcal) => onUpdateGoals({ targetKcal })}
               className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 font-mono text-emerald-400 font-semibold"
             />
           </label>
           <label className="space-y-1">
             <span className="text-zinc-400">Protéines (g)</span>
-            <input
-              type="number"
+            <NumberInput
+              min={0}
               value={goals.proteinG}
-              onChange={(e) => onUpdateGoals({ proteinG: Number(e.target.value) })}
+              onValueChange={(proteinG) => onUpdateGoals({ proteinG })}
               className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 font-mono"
             />
           </label>
           <label className="space-y-1">
             <span className="text-zinc-400">Glucides (g)</span>
-            <input
-              type="number"
+            <NumberInput
+              min={0}
               value={goals.carbsG}
-              onChange={(e) => onUpdateGoals({ carbsG: Number(e.target.value) })}
+              onValueChange={(carbsG) => onUpdateGoals({ carbsG })}
               className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 font-mono"
             />
           </label>
           <label className="space-y-1">
             <span className="text-zinc-400">Lipides (g)</span>
-            <input
-              type="number"
+            <NumberInput
+              min={0}
               value={goals.fatG}
-              onChange={(e) => onUpdateGoals({ fatG: Number(e.target.value) })}
+              onValueChange={(fatG) => onUpdateGoals({ fatG })}
               className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 font-mono"
             />
           </label>
           <label className="space-y-1">
             <span className="text-zinc-400">Objectif Pas</span>
-            <input
-              type="number"
+            <NumberInput
+              min={0}
               step="500"
               value={goals.targetSteps}
-              onChange={(e) => onUpdateGoals({ targetSteps: Number(e.target.value) })}
+              onValueChange={(targetSteps) => onUpdateGoals({ targetSteps })}
               className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 font-mono"
             />
           </label>
           <label className="space-y-1">
             <span className="text-zinc-400">Hydratation (ml)</span>
-            <input
-              type="number"
+            <NumberInput
+              min={0}
               step="100"
               value={goals.targetWaterMl}
-              onChange={(e) => onUpdateGoals({ targetWaterMl: Number(e.target.value) })}
+              onValueChange={(targetWaterMl) => onUpdateGoals({ targetWaterMl })}
               className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 font-mono"
             />
           </label>
@@ -362,12 +365,12 @@ export function GoalsTdeeView({
 
         <label className="block space-y-1 text-xs max-w-xs">
           <span className="text-zinc-400">Seuil de maintenance poids (kg / semaine)</span>
-          <input
-            type="number"
+          <NumberInput
+            min={0.01}
             step="0.05"
             value={profile.weightTrendThresholdKgWeek}
-            onChange={(e) =>
-              onUpdateProfile({ weightTrendThresholdKgWeek: Number(e.target.value) })
+            onValueChange={(weightTrendThresholdKgWeek) =>
+              onUpdateProfile({ weightTrendThresholdKgWeek })
             }
             className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 font-mono"
           />
@@ -396,10 +399,10 @@ export function GoalsTdeeView({
                   <span>{meta.label}</span>
                 </label>
                 <div className="flex items-center gap-1.5">
-                  <input
-                    type="number"
+                  <NumberInput
+                    min={0}
                     value={target}
-                    onChange={(e) => updateMicroTarget(meta.key, Number(e.target.value))}
+                    onValueChange={(val) => updateMicroTarget(meta.key, val)}
                     className="w-20 rounded-lg bg-zinc-900 border border-zinc-800 px-2 py-1 text-right font-mono"
                   />
                   <span className="text-zinc-500 w-7">{meta.unit}</span>

@@ -9,6 +9,7 @@ import {
   NutrientValues,
 } from "@/lib/types";
 import { TrashIcon, XIcon } from "./Icons";
+import { NumberInput } from "./NumberInput";
 
 interface FoodLogDetailModalProps {
   entry: FoodLogEntry | null;
@@ -125,12 +126,11 @@ export function FoodLogDetailModal({
           <div className="flex items-center justify-between gap-3">
             <label className="text-xs font-medium text-zinc-400">Quantité (grammes / ml)</label>
             <div className="flex items-center gap-2">
-              <input
-                type="number"
+              <NumberInput
                 min={1}
                 step="1"
                 value={quantityG}
-                onChange={(e) => applyQuantity(Number(e.target.value))}
+                onValueChange={applyQuantity}
                 className="w-24 rounded-xl bg-[#181d2a] border border-white/10 px-3 py-1.5 text-right font-mono text-base font-bold text-blue-400 focus:outline-none focus:border-blue-500"
               />
               <span className="text-xs text-zinc-400">g</span>
