@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    const model = process.env.GEMINI_MODEL || "gemini-4-hydrogen";
     const cleaned = imageBase64.replace(/^data:image\/\w+;base64,/, "");
 
     const geminiRes = await fetch(
