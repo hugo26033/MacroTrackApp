@@ -51,6 +51,7 @@ export function QuickAddModal({
   const [productQtyG, setProductQtyG] = useState<number>(100);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const scanTimerRef = useRef<number | null>(null);
 
   // Gemini AI state
   const [aiText, setAiText] = useState("");
@@ -84,16 +85,25 @@ export function QuickAddModal({
   }, [scanningCamera]);
 
   function stopCamera() {
+    if (scanTimerRef.current !== null) {
+      window.clearTimeout(scanTimerRef.current);
+      scanTimerRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
     setScanningCamera(false);
   }
 
   async function getBarcodeDetector() {
     type DetectorInstance = {
-      detect: (src: HTMLVideoElement | ImageBitmap) => Promise<Array<{ rawValue: string }>>;
+      detect: (
+        src: HTMLVideoElement | ImageBitmap | HTMLCanvasElement
+      ) => Promise<Array<{ rawValue: string }>>;
     };
     type DetectorCtor = new (opts: {
       formats: Array<"ean_13" | "ean_8" | "upc_a" | "upc_e" | "code_128">;
@@ -121,18 +131,44 @@ export function QuickAddModal({
     });
   }
 
+  /**
+   * Downscale large camera photos (e.g. 12-48 MP on iPhone) before passing
+   * them to the barcode detector so WASM decoding stays fast and within memory limits.
+   */
+  async function decodeBarcodeFromFile(file: File): Promise<string | null> {
+    const detector = await getBarcodeDetector();
+    const bitmap = await createImageBitmap(file);
+    try {
+      const maxSide = 1600;
+      const largest = Math.max(bitmap.width, bitmap.height);
+      if (largest > maxSide) {
+        const scale = maxSide / largest;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(bitmap.width * scale);
+        canvas.height = Math.round(bitmap.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+          const codes = await detector.detect(canvas);
+          return codes[0]?.rawValue ?? null;
+        }
+      }
+      const codes = await detector.detect(bitmap);
+      return codes[0]?.rawValue ?? null;
+    } finally {
+      bitmap.close?.();
+    }
+  }
+
   async function handleBarcodePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
     setBarcodeError(null);
     setBarcodeLoading(true);
     try {
-      const detector = await getBarcodeDetector();
-      const bitmap = await createImageBitmap(file);
-      const codes = await detector.detect(bitmap);
-      bitmap.close?.();
-      if (codes.length > 0 && codes[0].rawValue) {
-        const code = codes[0].rawValue;
+      const code = await decodeBarcodeFromFile(file);
+      if (code) {
         setBarcodeInput(code);
         await lookupBarcode(code);
       } else {
@@ -145,14 +181,41 @@ export function QuickAddModal({
           : "Impossible de lire le code-barres sur cette photo."
       );
     } finally {
+      // Reset input so taking another photo on iOS Safari always fires onChange
+      input.value = "";
       setBarcodeLoading(false);
     }
   }
 
+  function formatCameraError(err: unknown): string {
+    if (err instanceof DOMException || err instanceof Error) {
+      const name = err.name;
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        return "Accès caméra refusé. Sur Safari iOS, vérifie Réglages > Safari > Caméra (ou le menu aA de la barre d'adresse), ou utilise « Photo code-barres ».";
+      }
+      if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        return "Aucune caméra détectée sur cet appareil. Utilise « Photo code-barres ».";
+      }
+      if (name === "NotReadableError" || name === "TrackStartError") {
+        return "Caméra déjà utilisée par une autre application. Ferme-la ou utilise « Photo code-barres ».";
+      }
+      return `Caméra en direct : ${err.message}. Essaie « Photo code-barres ».`;
+    }
+    return "Permission caméra refusée ou indisponible. Utilise « Photo code-barres ».";
+  }
+
   async function startCameraScan() {
     setBarcodeError(null);
+    if (!window.isSecureContext) {
+      setBarcodeError(
+        "La caméra en direct nécessite une connexion HTTPS sur Safari iOS. Utilise « Photo code-barres » à la place."
+      );
+      return;
+    }
     if (!navigator.mediaDevices?.getUserMedia) {
-      setBarcodeError("Caméra en direct indisponible. Utilise 'Photo code-barres' ou saisis les chiffres.");
+      setBarcodeError(
+        "Caméra en direct indisponible sur ce navigateur. Utilise « Photo code-barres » ou saisis les chiffres."
+      );
       return;
     }
 
@@ -183,17 +246,13 @@ export function QuickAddModal({
           }
         }
         if (streamRef.current) {
-          setTimeout(() => requestAnimationFrame(tick), 150);
+          scanTimerRef.current = window.setTimeout(() => requestAnimationFrame(tick), 150);
         }
       };
-      setTimeout(() => requestAnimationFrame(tick), 250);
+      scanTimerRef.current = window.setTimeout(() => requestAnimationFrame(tick), 250);
     } catch (err) {
       stopCamera();
-      setBarcodeError(
-        err instanceof Error
-          ? `Caméra en direct : ${err.message}. Essaie 'Photo code-barres'.`
-          : "Permission caméra refusée ou indisponible."
-      );
+      setBarcodeError(formatCameraError(err));
     }
   }
 
