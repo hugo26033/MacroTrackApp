@@ -76,7 +76,8 @@ function formatDateHeader(iso: string): string {
 }
 
 function getWeekDaysISO(centerISO: string): string[] {
-  const base = centerISO ? new Date(`${centerISO}T12:00:00`) : new Date();
+  if (!centerISO) return [];
+  const base = new Date(`${centerISO}T12:00:00`);
   const day = base.getDay(); // 0=Sun..6=Sat
   const diffToMon = day === 0 ? -6 : 1 - day;
   const monday = new Date(base);
@@ -168,6 +169,7 @@ export function MacroPulseApp() {
   const weekDays = useMemo(() => getWeekDaysISO(selectedDate), [selectedDate]);
 
   const streakCount = useMemo(() => {
+    if (!hydrated || loggedDatesSet.size === 0) return 0;
     const today = todayISO();
     let count = 0;
     const cursor = new Date(`${today}T12:00:00`);
@@ -180,7 +182,7 @@ export function MacroPulseApp() {
       cursor.setDate(cursor.getDate() - 1);
     }
     return count;
-  }, [loggedDatesSet]);
+  }, [hydrated, loggedDatesSet]);
 
   function openQuickAdd(tab: QuickAddTabMode = "all", slot: MealSlot = "lunch") {
     setAddSheetOpen(false);
@@ -748,7 +750,7 @@ export function MacroPulseApp() {
                     <p className="text-xs text-zinc-400 mt-0.5">
                       {fastingStatus.currentFastHours.toFixed(1)}h / {state.profile.fastingTargetHours}h
                       {" · "}
-                      {fastingStatus.isFastingWindow ? "En cours" : "Fenêtre active"}
+                      {fastingStatus.isCurrentlyFasting ? "En cours" : "Fenêtre active"}
                     </p>
                   </div>
                   <ChevronRightIcon className="w-4 h-4 text-zinc-400 shrink-0" />

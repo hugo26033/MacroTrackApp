@@ -58,6 +58,7 @@ export function QuickAddModal({
 
   // Barcode state
   const [barcodeInput, setBarcodeInput] = useState("");
+  const [barcodePhotoPreview, setBarcodePhotoPreview] = useState<string | null>(null);
   const [scanningCamera, setScanningCamera] = useState(false);
   const [barcodeLoading, setBarcodeLoading] = useState(false);
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
@@ -183,26 +184,36 @@ export function QuickAddModal({
     const file = input.files?.[0];
     if (!file) return;
     setBarcodeError(null);
+    setFoundProduct(null);
     setBarcodeLoading(true);
-    try {
-      const code = await decodeBarcodeFromFile(file);
-      if (code) {
-        setBarcodeInput(code);
-        await lookupBarcode(code);
-      } else {
-        setBarcodeError("Aucun code-barres détecté sur cette photo. Rapproche-toi ou saisis les chiffres.");
+
+    const mime = file.type || "image/jpeg";
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = String(reader.result);
+      setBarcodePhotoPreview(dataUrl);
+      try {
+        const res = await fetch("/api/ai/read-barcode", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageBase64: dataUrl, mimeType: mime }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.barcode) {
+          setBarcodeError(data.error || "Code-barres illisible sur la photo.");
+          setBarcodeLoading(false);
+          return;
+        }
+        setBarcodeInput(data.barcode);
+        await lookupBarcode(data.barcode);
+      } catch {
+        setBarcodeError("Impossible de lire le code-barres via Gemini.");
+        setBarcodeLoading(false);
+      } finally {
+        input.value = "";
       }
-    } catch (err) {
-      setBarcodeError(
-        err instanceof Error
-          ? `Erreur lecture photo code-barres : ${err.message}`
-          : "Impossible de lire le code-barres sur cette photo."
-      );
-    } finally {
-      // Reset input so taking another photo on iOS Safari always fires onChange
-      input.value = "";
-      setBarcodeLoading(false);
-    }
+    };
+    reader.readAsDataURL(file);
   }
 
   function formatCameraError(err: unknown): string {
@@ -606,7 +617,7 @@ export function QuickAddModal({
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleQuickAddRecipe(r)}
+                        onClick={() => handleAddRecipe(r)}
                         className="shrink-0 w-9 h-9 rounded-full bg-[#242b3d] hover:bg-blue-500 text-blue-400 hover:text-white flex items-center justify-center transition"
                         title="Ajouter cette recette"
                       >
@@ -654,7 +665,7 @@ export function QuickAddModal({
                           </div>
                           <button
                             type="button"
-                            onClick={() => handleQuickAddSavedFood(f)}
+                            onClick={() => handleAddSavedFood(f)}
                             className="shrink-0 w-9 h-9 rounded-full bg-[#242b3d] hover:bg-blue-500 text-blue-400 hover:text-white flex items-center justify-center transition"
                             title="Consigner cet aliment"
                           >
@@ -673,14 +684,41 @@ export function QuickAddModal({
         {/* TAB 1: BARCODE */}
         {tab === "barcode" && (
           <div className="space-y-4">
+            <label className="block w-full cursor-pointer rounded-2xl border-2 border-dashed border-zinc-700 hover:border-emerald-500/60 p-4 text-center transition">
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleBarcodePhotoUpload}
+                className="hidden"
+              />
+              {barcodePhotoPreview ? (
+                <img
+                  src={barcodePhotoPreview}
+                  alt="Photo du code-barres"
+                  className="mx-auto max-h-40 rounded-xl object-cover"
+                />
+              ) : (
+                <div className="py-3 text-xs text-zinc-400 space-y-1">
+                  <CameraIcon className="w-6 h-6 mx-auto text-emerald-400" />
+                  <p className="font-medium text-zinc-200">
+                    Prendre en photo le code-barres (IA Gemini)
+                  </p>
+                  <p className="text-[11px] text-zinc-500">
+                    Gemini lit les chiffres automatiquement et charge la fiche Open Food Facts
+                  </p>
+                </div>
+              )}
+            </label>
+
             <div className="flex gap-2">
               <input
                 type="text"
                 inputMode="numeric"
                 value={barcodeInput}
                 onChange={(e) => setBarcodeInput(e.target.value)}
-                placeholder="Ex: 3017620422003 (Nutella, Skyr...)"
-                className="flex-1 rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500"
+                placeholder="Ou saisis le code : 3017620422003"
+                className="flex-1 rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-emerald-500"
               />
               <button
                 type="button"
@@ -692,28 +730,15 @@ export function QuickAddModal({
               </button>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={scanningCamera ? stopCamera : startCameraScan}
-                  className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-medium inline-flex items-center gap-2"
-                >
-                  <CameraIcon className="w-4 h-4 text-emerald-400" />
-                  {scanningCamera ? "Arrêter la caméra" : "Scanner en direct"}
-                </button>
-                <label className="cursor-pointer px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-medium inline-flex items-center gap-2">
-                  <CameraIcon className="w-4 h-4 text-sky-400" />
-                  <span>Photo code-barres</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleBarcodePhotoUpload}
-                    className="hidden"
-                  />
-                </label>
-              </div>
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={scanningCamera ? stopCamera : startCameraScan}
+                className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-medium inline-flex items-center gap-1.5"
+              >
+                <CameraIcon className="w-3.5 h-3.5 text-zinc-400" />
+                {scanningCamera ? "Arrêter flux vidéo" : "Flux vidéo en direct (optionnel)"}
+              </button>
               <span className="text-[11px] text-zinc-500">Open Food Facts</span>
             </div>
 
