@@ -76,6 +76,13 @@ export function QuickAddModal({
     return () => stopCamera();
   }, [open]);
 
+  useEffect(() => {
+    if (scanningCamera && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [scanningCamera]);
+
   function stopCamera() {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
@@ -93,29 +100,26 @@ export function QuickAddModal({
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: { facingMode: { ideal: "environment" } },
       });
       streamRef.current = stream;
       setScanningCamera(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
 
-      // Utilise BarcodeDetector natif si supporté (Chrome/Android/Edge)
-      const BarcodeDetectorCtor = (
-        window as unknown as {
-          BarcodeDetector?: new (opts: { formats: string[] }) => {
-            detect: (src: HTMLVideoElement) => Promise<Array<{ rawValue: string }>>;
-          };
-        }
+      // Utilise BarcodeDetector natif si supporté, sinon le ponyfill ZXing WASM (Safari iOS / Firefox)
+      type DetectorInstance = {
+        detect: (src: HTMLVideoElement) => Promise<Array<{ rawValue: string }>>;
+      };
+      type DetectorCtor = new (opts: {
+        formats: Array<"ean_13" | "ean_8" | "upc_a" | "upc_e" | "code_128">;
+      }) => DetectorInstance;
+
+      let BarcodeDetectorCtor = (
+        window as unknown as { BarcodeDetector?: DetectorCtor }
       ).BarcodeDetector;
 
       if (!BarcodeDetectorCtor) {
-        setBarcodeError(
-          "Caméra ouverte. La détection auto n'est pas supportée sur ce navigateur : saisis le code ci-dessous."
-        );
-        return;
+        const mod = await import("barcode-detector/ponyfill");
+        BarcodeDetectorCtor = mod.BarcodeDetector as unknown as DetectorCtor;
       }
 
       const detector = new BarcodeDetectorCtor({
@@ -123,24 +127,27 @@ export function QuickAddModal({
       });
 
       const tick = async () => {
-        if (!streamRef.current || !videoRef.current) return;
-        try {
-          const codes = await detector.detect(videoRef.current);
-          if (codes.length > 0 && codes[0].rawValue) {
-            const code = codes[0].rawValue;
-            setBarcodeInput(code);
-            stopCamera();
-            await lookupBarcode(code);
-            return;
+        if (!streamRef.current) return;
+        const video = videoRef.current;
+        if (video && video.readyState >= 2) {
+          try {
+            const codes = await detector.detect(video);
+            if (codes.length > 0 && codes[0].rawValue) {
+              const code = codes[0].rawValue;
+              setBarcodeInput(code);
+              stopCamera();
+              await lookupBarcode(code);
+              return;
+            }
+          } catch {
+            // ignore frame detection errors
           }
-        } catch {
-          // ignore frame detection errors
         }
         if (streamRef.current) {
-          requestAnimationFrame(tick);
+          setTimeout(() => requestAnimationFrame(tick), 150);
         }
       };
-      requestAnimationFrame(tick);
+      setTimeout(() => requestAnimationFrame(tick), 250);
     } catch {
       setBarcodeError("Permission caméra refusée ou indisponible.");
     }
