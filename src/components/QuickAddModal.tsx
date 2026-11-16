@@ -91,10 +91,68 @@ export function QuickAddModal({
     setScanningCamera(false);
   }
 
+  async function getBarcodeDetector() {
+    type DetectorInstance = {
+      detect: (src: HTMLVideoElement | ImageBitmap) => Promise<Array<{ rawValue: string }>>;
+    };
+    type DetectorCtor = new (opts: {
+      formats: Array<"ean_13" | "ean_8" | "upc_a" | "upc_e" | "code_128">;
+    }) => DetectorInstance;
+
+    let BarcodeDetectorCtor = (
+      window as unknown as { BarcodeDetector?: DetectorCtor }
+    ).BarcodeDetector;
+
+    if (!BarcodeDetectorCtor) {
+      const mod = await import("barcode-detector/ponyfill");
+      if (typeof mod.prepareZXingModule === "function") {
+        mod.prepareZXingModule({
+          overrides: {
+            locateFile: (path: string, prefix: string) =>
+              path.endsWith(".wasm") ? "/wasm/zxing_reader.wasm" : `${prefix}${path}`,
+          },
+        });
+      }
+      BarcodeDetectorCtor = mod.BarcodeDetector as unknown as DetectorCtor;
+    }
+
+    return new BarcodeDetectorCtor({
+      formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"],
+    });
+  }
+
+  async function handleBarcodePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBarcodeError(null);
+    setBarcodeLoading(true);
+    try {
+      const detector = await getBarcodeDetector();
+      const bitmap = await createImageBitmap(file);
+      const codes = await detector.detect(bitmap);
+      bitmap.close?.();
+      if (codes.length > 0 && codes[0].rawValue) {
+        const code = codes[0].rawValue;
+        setBarcodeInput(code);
+        await lookupBarcode(code);
+      } else {
+        setBarcodeError("Aucun code-barres détecté sur cette photo. Rapproche-toi ou saisis les chiffres.");
+      }
+    } catch (err) {
+      setBarcodeError(
+        err instanceof Error
+          ? `Erreur lecture photo code-barres : ${err.message}`
+          : "Impossible de lire le code-barres sur cette photo."
+      );
+    } finally {
+      setBarcodeLoading(false);
+    }
+  }
+
   async function startCameraScan() {
     setBarcodeError(null);
     if (!navigator.mediaDevices?.getUserMedia) {
-      setBarcodeError("Caméra indisponible sur ce navigateur. Saisis le code-barres manuellement.");
+      setBarcodeError("Caméra en direct indisponible. Utilise 'Photo code-barres' ou saisis les chiffres.");
       return;
     }
 
@@ -105,26 +163,7 @@ export function QuickAddModal({
       streamRef.current = stream;
       setScanningCamera(true);
 
-      // Utilise BarcodeDetector natif si supporté, sinon le ponyfill ZXing WASM (Safari iOS / Firefox)
-      type DetectorInstance = {
-        detect: (src: HTMLVideoElement) => Promise<Array<{ rawValue: string }>>;
-      };
-      type DetectorCtor = new (opts: {
-        formats: Array<"ean_13" | "ean_8" | "upc_a" | "upc_e" | "code_128">;
-      }) => DetectorInstance;
-
-      let BarcodeDetectorCtor = (
-        window as unknown as { BarcodeDetector?: DetectorCtor }
-      ).BarcodeDetector;
-
-      if (!BarcodeDetectorCtor) {
-        const mod = await import("barcode-detector/ponyfill");
-        BarcodeDetectorCtor = mod.BarcodeDetector as unknown as DetectorCtor;
-      }
-
-      const detector = new BarcodeDetectorCtor({
-        formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"],
-      });
+      const detector = await getBarcodeDetector();
 
       const tick = async () => {
         if (!streamRef.current) return;
@@ -148,8 +187,13 @@ export function QuickAddModal({
         }
       };
       setTimeout(() => requestAnimationFrame(tick), 250);
-    } catch {
-      setBarcodeError("Permission caméra refusée ou indisponible.");
+    } catch (err) {
+      stopCamera();
+      setBarcodeError(
+        err instanceof Error
+          ? `Caméra en direct : ${err.message}. Essaie 'Photo code-barres'.`
+          : "Permission caméra refusée ou indisponible."
+      );
     }
   }
 
@@ -428,21 +472,34 @@ export function QuickAddModal({
               </button>
             </div>
 
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={scanningCamera ? stopCamera : startCameraScan}
-                className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-medium inline-flex items-center gap-2"
-              >
-                <CameraIcon className="w-4 h-4 text-emerald-400" />
-                {scanningCamera ? "Arrêter la caméra" : "Scanner avec la caméra"}
-              </button>
-              <span className="text-[11px] text-zinc-500">Base Open Food Facts</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={scanningCamera ? stopCamera : startCameraScan}
+                  className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-medium inline-flex items-center gap-2"
+                >
+                  <CameraIcon className="w-4 h-4 text-emerald-400" />
+                  {scanningCamera ? "Arrêter la caméra" : "Scanner en direct"}
+                </button>
+                <label className="cursor-pointer px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-medium inline-flex items-center gap-2">
+                  <CameraIcon className="w-4 h-4 text-sky-400" />
+                  <span>Photo code-barres</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleBarcodePhotoUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+              <span className="text-[11px] text-zinc-500">Open Food Facts</span>
             </div>
 
             {scanningCamera && (
               <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-black">
-                <video ref={videoRef} className="w-full max-h-56 object-cover" muted playsInline />
+                <video ref={videoRef} autoPlay muted playsInline className="w-full max-h-56 object-cover" />
               </div>
             )}
 
