@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { FoodItem, MicronutrientKey } from "@/lib/types";
 
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9%]+/g, " ")
+    .trim();
+}
+
+function slugifyBrand(brand: string): string {
+  return brand
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function normalizeProduct(p: Record<string, unknown>, idx: number): FoodItem | null {
   const rawName = p.product_name_fr || p.product_name;
   if (!rawName || typeof rawName !== "string") return null;
@@ -56,9 +74,86 @@ function normalizeProduct(p: Record<string, unknown>, idx: number): FoodItem | n
   };
 }
 
+function scoreAndSortProducts(
+  items: FoodItem[],
+  nameTokens: string[],
+  brandTokens: string[]
+): FoodItem[] {
+  const scored = items.map((item) => {
+    const normName = normalizeText(item.name);
+    const normBrand = normalizeText(item.brand ?? "");
+    const combined = `${normName} ${normBrand}`.trim();
+
+    let nameHits = 0;
+    for (const t of nameTokens) {
+      if (normName.includes(t)) nameHits += 1;
+    }
+
+    let brandHits = 0;
+    for (const t of brandTokens) {
+      if (normBrand.includes(t)) brandHits += 1;
+    }
+
+    const allNameMatch = nameTokens.length > 0 && nameHits === nameTokens.length;
+    const allBrandMatch = brandTokens.length === 0 || brandHits === brandTokens.length;
+    const allCombinedMatch =
+      nameTokens.length + brandTokens.length > 0 &&
+      [...nameTokens, ...brandTokens].every((t) => combined.includes(t));
+
+    let score = nameHits * 10 + brandHits * 6;
+    if (allNameMatch) score += 25;
+    if (allNameMatch && allBrandMatch) score += 30;
+    if (allCombinedMatch) score += 15;
+    // Slight penalty for empty nutrition
+    if (item.per100g.kcal === 0 && item.per100g.proteinG === 0 && item.per100g.carbsG === 0) {
+      score -= 2;
+    }
+
+    return { item, score, nameHits };
+  });
+
+  // If at least one item matches a name token, drop completely unrelated brand-only noise
+  const hasNameMatches = scored.some((s) => s.nameHits > 0);
+  const filtered = hasNameMatches ? scored.filter((s) => s.nameHits > 0) : scored;
+
+  filtered.sort((a, b) => b.score - a.score);
+  return filtered.slice(0, 15).map((s) => s.item);
+}
+
+async function querySearchALicious(
+  q: string,
+  brandSlug: string | null,
+  headers: Record<string, string>
+): Promise<FoodItem[]> {
+  const searchUrl = new URL("https://search.openfoodfacts.org/search");
+  const fullQuery = brandSlug ? `${q} brands_tags:${brandSlug}`.trim() : q;
+  searchUrl.searchParams.set("q", fullQuery);
+  searchUrl.searchParams.set("langs", "fr");
+  searchUrl.searchParams.set("page_size", "30");
+  searchUrl.searchParams.set(
+    "fields",
+    "code,product_name,product_name_fr,brands,serving_quantity,serving_size,nutriments"
+  );
+
+  const res = await fetch(searchUrl.toString(), {
+    headers,
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!res.ok) {
+    throw new Error(`Search-a-licious HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  const hits = Array.isArray(data.hits) ? data.hits : [];
+  return hits
+    .map((p: Record<string, unknown>, idx: number) => normalizeProduct(p, idx))
+    .filter((item: FoodItem | null): item is FoodItem => item !== null);
+}
+
 export async function GET(req: NextRequest) {
-  const q = req.nextUrl.searchParams.get("q")?.trim();
-  if (!q || q.length < 2) {
+  const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const brand = req.nextUrl.searchParams.get("brand")?.trim() ?? "";
+
+  if (q.length < 2 && brand.length < 2) {
     return NextResponse.json({ products: [] });
   }
 
@@ -66,30 +161,58 @@ export async function GET(req: NextRequest) {
     "User-Agent": "MacroPulse-PWA/1.0 (https://github.com/hugo26033/MacroTrackApp)",
   };
 
-  // 1. Moteur rapide Search-a-licious Open Food Facts (~10ms)
+  const nameTokens = normalizeText(q).split(" ").filter((t) => t.length >= 2);
+  const brandTokens = normalizeText(brand).split(" ").filter((t) => t.length >= 2);
+  const brandSlug = brand ? slugifyBrand(brand) : null;
+
+  // 1. Moteur rapide Search-a-licious Open Food Facts
   try {
-    const searchUrl = new URL("https://search.openfoodfacts.org/search");
-    searchUrl.searchParams.set("q", q);
-    searchUrl.searchParams.set("langs", "fr");
-    searchUrl.searchParams.set("page_size", "12");
-    searchUrl.searchParams.set(
-      "fields",
-      "code,product_name,brands,serving_quantity,serving_size,nutriments"
-    );
+    let items = await querySearchALicious(q, brandSlug, headers);
 
-    const res = await fetch(searchUrl.toString(), {
-      headers,
-      signal: AbortSignal.timeout(6000),
-    });
+    // Si la marque a été tapée dans la description (ex: "fromage blanc carrefour")
+    // et que Search-a-licious n'a retourné que des produits d'une marque sans rapport,
+    // on tente le dernier mot (ou le premier) comme filtre brands_tags.
+    if (!brandSlug && nameTokens.length >= 2) {
+      const firstPassMatches = items.filter((item) => {
+        const normName = normalizeText(item.name);
+        return nameTokens.slice(0, -1).every((t) => normName.includes(t));
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      const hits = Array.isArray(data.hits) ? data.hits : [];
-      const products = hits
-        .map((p: Record<string, unknown>, idx: number) => normalizeProduct(p, idx))
-        .filter((item: FoodItem | null): item is FoodItem => item !== null);
-      return NextResponse.json({ products });
+      if (firstPassMatches.length === 0) {
+        const rawTokens = q.split(/\s+/).filter(Boolean);
+        const candidateBrand = rawTokens[rawTokens.length - 1];
+        const candidateQuery = rawTokens.slice(0, -1).join(" ");
+        const candidateBrandSlug = slugifyBrand(candidateBrand);
+
+        if (candidateQuery.length >= 2 && candidateBrandSlug.length >= 2) {
+          const targeted = await querySearchALicious(
+            candidateQuery,
+            candidateBrandSlug,
+            headers
+          );
+          if (targeted.length > 0) {
+            const targetedNameTokens = normalizeText(candidateQuery)
+              .split(" ")
+              .filter((t) => t.length >= 2);
+            const targetedBrandTokens = normalizeText(candidateBrand)
+              .split(" ")
+              .filter((t) => t.length >= 2);
+            return NextResponse.json({
+              products: scoreAndSortProducts(targeted, targetedNameTokens, targetedBrandTokens),
+            });
+          }
+        }
+      }
     }
+
+    // Si brandSlug est précisé mais trop strict (0 résultat), relancer sans brands_tags et scorer
+    if (brandSlug && items.length === 0 && q.length >= 2) {
+      items = await querySearchALicious(q, null, headers);
+    }
+
+    return NextResponse.json({
+      products: scoreAndSortProducts(items, nameTokens, brandTokens),
+    });
   } catch {
     // Fallback vers cgi/search.pl ci-dessous
   }
@@ -97,11 +220,12 @@ export async function GET(req: NextRequest) {
   // 2. Fallback classique Open Food Facts
   try {
     const legacyUrl = new URL("https://world.openfoodfacts.org/cgi/search.pl");
-    legacyUrl.searchParams.set("search_terms", q);
+    legacyUrl.searchParams.set("search_terms", [q, brand].filter(Boolean).join(" "));
     legacyUrl.searchParams.set("search_simple", "1");
     legacyUrl.searchParams.set("action", "process");
     legacyUrl.searchParams.set("json", "1");
-    legacyUrl.searchParams.set("page_size", "12");
+    legacyUrl.searchParams.set("sort_by", "unique_scans_n");
+    legacyUrl.searchParams.set("page_size", "20");
     legacyUrl.searchParams.set(
       "fields",
       "code,product_name,product_name_fr,brands,serving_quantity,serving_size,nutriments"
@@ -125,7 +249,9 @@ export async function GET(req: NextRequest) {
       .map((p: Record<string, unknown>, idx: number) => normalizeProduct(p, idx))
       .filter((item: FoodItem | null): item is FoodItem => item !== null);
 
-    return NextResponse.json({ products });
+    return NextResponse.json({
+      products: scoreAndSortProducts(products, nameTokens, brandTokens),
+    });
   } catch {
     return NextResponse.json(
       { error: "Délai dépassé lors de la recherche Open Food Facts.", products: [] },

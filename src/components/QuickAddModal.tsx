@@ -55,6 +55,7 @@ export function QuickAddModal({
   const [tab, setTab] = useState<QuickAddTabMode>(initialTab);
   const [mealSlot, setMealSlot] = useState<MealSlot>(initialMealSlot);
   const [searchQuery, setSearchQuery] = useState("");
+  const [brandQuery, setBrandQuery] = useState("");
   const [offResults, setOffResults] = useState<FoodItem[]>([]);
   const [offLoading, setOffLoading] = useState(false);
   const [offError, setOffError] = useState<string | null>(null);
@@ -90,7 +91,8 @@ export function QuickAddModal({
 
   useEffect(() => {
     const q = searchQuery.trim();
-    if (q.length < 2 || (tab !== "all" && tab !== "foods")) {
+    const brand = brandQuery.trim();
+    if ((q.length < 2 && brand.length < 2) || (tab !== "all" && tab !== "foods")) {
       setOffResults([]);
       setOffError(null);
       setOffLoading(false);
@@ -102,7 +104,10 @@ export function QuickAddModal({
       setOffLoading(true);
       setOffError(null);
       try {
-        const res = await fetch(`/api/foods/search?q=${encodeURIComponent(q)}`, {
+        const params = new URLSearchParams();
+        if (q) params.set("q", q);
+        if (brand) params.set("brand", brand);
+        const res = await fetch(`/api/foods/search?${params.toString()}`, {
           signal: controller.signal,
         });
         const data = await res.json();
@@ -125,13 +130,14 @@ export function QuickAddModal({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [searchQuery, tab]);
+  }, [searchQuery, brandQuery, tab]);
 
   useEffect(() => {
     if (open) {
       setTab(initialTab);
       setMealSlot(initialMealSlot);
       setSearchQuery("");
+      setBrandQuery("");
     } else {
       stopCamera();
     }
@@ -519,12 +525,16 @@ export function QuickAddModal({
   if (!open) return null;
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
-  const filteredFoods = foods.filter(
-    (f) =>
+  const normalizedBrand = brandQuery.trim().toLowerCase();
+  const filteredFoods = foods.filter((f) => {
+    const matchesName =
       !normalizedQuery ||
       f.name.toLowerCase().includes(normalizedQuery) ||
-      (f.brand && f.brand.toLowerCase().includes(normalizedQuery))
-  );
+      (!normalizedBrand && Boolean(f.brand && f.brand.toLowerCase().includes(normalizedQuery)));
+    const matchesBrand =
+      !normalizedBrand || Boolean(f.brand && f.brand.toLowerCase().includes(normalizedBrand));
+    return matchesName && matchesBrand;
+  });
   const filteredRecipes = recipes.filter(
     (r) => !normalizedQuery || r.name.toLowerCase().includes(normalizedQuery)
   );
@@ -563,30 +573,56 @@ export function QuickAddModal({
           </span>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative flex items-center">
-          <SearchIcon className="w-4 h-4 text-zinc-400 absolute left-3.5 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              if (tab !== "all" && tab !== "foods" && tab !== "recipes") {
-                setTab("all");
-              }
-            }}
-            placeholder="Rechercher un aliment ou une recette..."
-            className="w-full rounded-full bg-[#181d2a] border border-white/10 pl-10 pr-9 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-blue-500"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 text-zinc-400 hover:text-zinc-200"
-            >
-              <XIcon className="w-4 h-4" />
-            </button>
-          )}
+        {/* Search Bars: Aliment + Marque */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="relative flex items-center sm:col-span-2">
+            <SearchIcon className="w-4 h-4 text-zinc-400 absolute left-3.5 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                if (tab !== "all" && tab !== "foods" && tab !== "recipes") {
+                  setTab("all");
+                }
+              }}
+              placeholder="Aliment (ex: Fromage blanc, Skyr...)"
+              className="w-full rounded-full bg-[#181d2a] border border-white/10 pl-10 pr-9 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-blue-500"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 text-zinc-400 hover:text-zinc-200"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          <div className="relative flex items-center">
+            <input
+              type="text"
+              value={brandQuery}
+              onChange={(e) => {
+                setBrandQuery(e.target.value);
+                if (tab !== "all" && tab !== "foods") {
+                  setTab("all");
+                }
+              }}
+              placeholder="Marque (ex: Carrefour)"
+              className="w-full rounded-full bg-[#181d2a] border border-white/10 px-4 pr-8 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-blue-500"
+            />
+            {brandQuery && (
+              <button
+                type="button"
+                onClick={() => setBrandQuery("")}
+                className="absolute right-3 text-zinc-400 hover:text-zinc-200"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Underline Tabs */}
