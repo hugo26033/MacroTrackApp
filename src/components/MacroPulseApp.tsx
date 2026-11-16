@@ -328,7 +328,7 @@ export function MacroPulseApp() {
   const dailyNote = state.dailyNotes?.[selectedDate] ?? "";
 
   const cardSurface = isDark
-    ? "bg-[#181d2a] border-white/[0.06]"
+    ? "bg-gradient-to-b from-[#1c2233] to-[#151925] border-white/[0.08] shadow-[0_10px_28px_-10px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.06)]"
     : "bg-white border-zinc-200 shadow-sm";
 
   return (
@@ -583,8 +583,10 @@ export function MacroPulseApp() {
               </div>
               <div className="h-2.5 rounded-full bg-[#242a3a] overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${
-                    kcalRemaining < 0 ? "bg-rose-500" : "bg-blue-500"
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    kcalRemaining < 0
+                      ? "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.45)]"
+                      : "bg-gradient-to-r from-blue-500 to-sky-400 shadow-[0_0_12px_rgba(59,130,246,0.45)]"
                   }`}
                   style={{ width: `${kcalPct}%` }}
                 />
@@ -702,7 +704,7 @@ export function MacroPulseApp() {
                           <button
                             type="button"
                             onClick={() => openQuickAdd("all", slot)}
-                            className="px-3.5 py-1.5 rounded-full bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 text-xs font-semibold transition"
+                            className="px-3.5 py-1.5 rounded-full bg-blue-500/15 hover:bg-blue-500/25 border border-blue-400/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] text-blue-400 text-xs font-semibold transition active:scale-[0.96]"
                           >
                             Consignez
                           </button>
@@ -1015,7 +1017,7 @@ export function MacroPulseApp() {
           <button
             type="button"
             onClick={() => setAddSheetOpen(true)}
-            className="pointer-events-auto w-14 h-14 rounded-full bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-500/35 flex items-center justify-center transition transform active:scale-95 shrink-0"
+            className="pointer-events-auto w-14 h-14 rounded-full bg-gradient-to-b from-blue-400 to-blue-600 hover:from-blue-300 hover:to-blue-500 text-white shadow-[0_8px_24px_-4px_rgba(59,130,246,0.6),inset_0_1px_0_rgba(255,255,255,0.35)] flex items-center justify-center transition transform active:scale-95 shrink-0"
             title="Ajouter un aliment, scanner un code-barres ou suivre une habitude"
           >
             <PlusIcon className="w-7 h-7" />
