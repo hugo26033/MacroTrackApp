@@ -51,6 +51,7 @@ import {
   XIcon,
 } from "./Icons";
 import { QuickAddModal, QuickAddTabMode } from "./QuickAddModal";
+import { ProfileMenuModal } from "./ProfileMenuModal";
 
 type ActiveTab = "today" | "analytics" | "fasting" | "goals";
 
@@ -96,6 +97,7 @@ export function MacroPulseApp() {
   const [selectedDate, setSelectedDate] = useState<string>("");
 
   // Modals & UI toggles
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState<string>("");
   const [showMicronutrients, setShowMicronutrients] = useState(false);
@@ -381,15 +383,15 @@ export function MacroPulseApp() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab(activeTab === "goals" ? "today" : "goals")}
+              onClick={() => setProfileMenuOpen(true)}
               className={`w-9 h-9 rounded-full border flex items-center justify-center transition ${
-                activeTab === "goals"
+                profileMenuOpen || activeTab === "goals"
                   ? "bg-blue-500 border-blue-400 text-white"
                   : isDark
                     ? "bg-[#181d2a] border-white/10 text-zinc-200 hover:bg-[#22283a]"
                     : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50"
               }`}
-              title="Profil & Objectifs"
+              title="Menu Profil"
             >
               <UserIcon className="w-4 h-4" />
             </button>
@@ -1127,6 +1129,49 @@ export function MacroPulseApp() {
         initialMealSlot={quickAddSlot}
         onAddFoodLogs={handleAddFoodLogs}
         onSaveCustomFood={handleSaveCustomFood}
+      />
+
+      <ProfileMenuModal
+        open={profileMenuOpen}
+        onClose={() => setProfileMenuOpen(false)}
+        displayName={state.profile.displayName}
+        streakCount={streakCount}
+        weights={state.weights}
+        fastingSummary={`${fastingStatus.currentFastHours.toFixed(1)}h / ${state.profile.fastingTargetHours}h`}
+        isDark={isDark}
+        onToggleTheme={() =>
+          setState((prev) => ({
+            ...prev,
+            profile: { ...prev.profile, theme: isDark ? "light" : "dark" },
+          }))
+        }
+        onNavigate={(tab) => setActiveTab(tab)}
+        onOpenFoods={() => openQuickAdd("foods")}
+        onExportJSON={() =>
+          downloadFile(
+            `macropulse-${todayISO()}.json`,
+            exportAppStateAsJSON(state),
+            "application/json"
+          )
+        }
+        onExportCSV={() =>
+          downloadFile(
+            `macropulse-repas-${todayISO()}.csv`,
+            exportFoodLogsAsCSV(state.foodLogs),
+            "text/csv"
+          )
+        }
+        onClearAllData={() =>
+          setState((prev) => ({
+            ...prev,
+            foods: [],
+            recipes: [],
+            foodLogs: [],
+            weights: [],
+            steps: [],
+            waterLogs: [],
+          }))
+        }
       />
     </div>
   );
