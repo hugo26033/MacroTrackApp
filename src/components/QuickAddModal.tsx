@@ -32,6 +32,7 @@ interface QuickAddModalProps {
   selectedDate: string;
   foods: FoodItem[];
   recipes: Recipe[];
+  foodLogs?: FoodLogEntry[];
   initialTab?: QuickAddTabMode;
   initialMealSlot?: MealSlot;
   onAddFoodLogs: (logs: Omit<FoodLogEntry, "id">[]) => void;
@@ -53,6 +54,7 @@ export function QuickAddModal({
   selectedDate,
   foods,
   recipes,
+  foodLogs = [],
   initialTab = "all",
   initialMealSlot = "lunch",
   onAddFoodLogs,
@@ -375,7 +377,8 @@ export function QuickAddModal({
         setBarcodeError(data.error || "Produit introuvable.");
       } else {
         setFoundProduct(data.product);
-        setProductQtyG(data.product.servingSizeG || 100);
+        const lastLog = getLastLoggedForFood(data.product);
+        setProductQtyG(lastLog?.quantityG ?? (data.product.servingSizeG || 100));
       }
     } catch {
       setBarcodeError("Erreur réseau lors de la recherche.");
@@ -478,8 +481,49 @@ export function QuickAddModal({
     onClose();
   }
 
+  function getLastLoggedForFood(food: FoodItem): FoodLogEntry | undefined {
+    const targetName = food.name.trim().toLowerCase();
+    for (let i = foodLogs.length - 1; i >= 0; i--) {
+      const log = foodLogs[i];
+      if (food.barcode && log.barcode && log.barcode === food.barcode) {
+        return log;
+      }
+      if (log.foodName.trim().toLowerCase() === targetName) {
+        return log;
+      }
+    }
+    return undefined;
+  }
+
+  function getLastLoggedForRecipe(recipe: Recipe): FoodLogEntry | undefined {
+    const targetName = recipe.name.trim().toLowerCase();
+    for (let i = foodLogs.length - 1; i >= 0; i--) {
+      const log = foodLogs[i];
+      if (log.source === "recipe" && log.foodName.trim().toLowerCase() === targetName) {
+        return log;
+      }
+    }
+    return undefined;
+  }
+
   function handleAddSavedFood(food: FoodItem) {
-    const qty = food.servingSizeG || 100;
+    const lastLog = getLastLoggedForFood(food);
+    const qty = lastLog?.quantityG ?? (food.servingSizeG || 100);
+    const unitFields =
+      lastLog?.unitQuantity !== undefined
+        ? {
+            unitQuantity: lastLog.unitQuantity,
+            unitLabel: lastLog.unitLabel || food.unitLabel || "unité",
+            unitWeightG: lastLog.unitWeightG || food.servingSizeG || qty,
+          }
+        : food.unitType === "unit"
+          ? {
+              unitQuantity: 1,
+              unitLabel: food.unitLabel || "unité",
+              unitWeightG: qty,
+            }
+          : {};
+
     onAddFoodLogs([
       {
         logDate: selectedDate,
@@ -489,13 +533,7 @@ export function QuickAddModal({
         brand: food.brand,
         barcode: food.barcode,
         quantityG: qty,
-        ...(food.unitType === "unit"
-          ? {
-              unitQuantity: 1,
-              unitLabel: food.unitLabel || "unité",
-              unitWeightG: qty,
-            }
-          : {}),
+        ...unitFields,
         nutrients: scaleNutrients(food.per100g, qty),
         source: "manual",
       },
@@ -549,9 +587,10 @@ export function QuickAddModal({
   }
 
   function openRecipeDetails(recipe: Recipe) {
+    const lastLog = getLastLoggedForRecipe(recipe);
     setSelectedRecipe(recipe);
     setAdjustedRecipeItems(recipe.items.map((item) => ({ ...item })));
-    setRecipePortionsToLog(1);
+    setRecipePortionsToLog(lastLog?.unitQuantity ?? 1);
     setCreatingRecipe(false);
   }
 
@@ -671,12 +710,27 @@ export function QuickAddModal({
   }
 
   function openFoodDetails(food: FoodItem) {
+    const lastLog = getLastLoggedForFood(food);
     const defaultWeight = food.servingSizeG || 100;
     setSelectedFood(food);
-    setSelectedQtyMode(food.unitType === "unit" ? "unit" : "grams");
-    setSelectedFoodQtyG(defaultWeight);
-    setSelectedUnitCount(1);
-    setSelectedUnitWeightG(defaultWeight);
+    if (lastLog) {
+      if (lastLog.unitQuantity !== undefined) {
+        setSelectedQtyMode("unit");
+        setSelectedUnitCount(lastLog.unitQuantity);
+        setSelectedUnitWeightG(lastLog.unitWeightG || defaultWeight);
+        setSelectedFoodQtyG(lastLog.quantityG);
+      } else {
+        setSelectedQtyMode(food.unitType === "unit" ? "unit" : "grams");
+        setSelectedFoodQtyG(lastLog.quantityG);
+        setSelectedUnitCount(1);
+        setSelectedUnitWeightG(defaultWeight);
+      }
+    } else {
+      setSelectedQtyMode(food.unitType === "unit" ? "unit" : "grams");
+      setSelectedFoodQtyG(defaultWeight);
+      setSelectedUnitCount(1);
+      setSelectedUnitWeightG(defaultWeight);
+    }
   }
 
   function handleConfirmSelectedFood() {
@@ -1442,7 +1496,14 @@ export function QuickAddModal({
                 ) : (
                   <div className="space-y-2">
                     {filteredFoods.map((f) => {
-                      const scaled = scaleNutrients(f.per100g, f.servingSizeG);
+                      const lastLog = getLastLoggedForFood(f);
+                      const displayQtyG = lastLog?.quantityG ?? (f.servingSizeG || 100);
+                      const scaled = scaleNutrients(f.per100g, displayQtyG);
+                      const qtyText = lastLog?.unitQuantity
+                        ? `${lastLog.unitQuantity} ${lastLog.unitLabel || f.unitLabel || "unité"} (${displayQtyG} g)`
+                        : lastLog
+                          ? `${displayQtyG} g`
+                          : f.servingLabel;
                       return (
                         <div
                           key={f.id}
@@ -1452,7 +1513,7 @@ export function QuickAddModal({
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-zinc-100 truncate">{f.name}</p>
                             <p className="text-xs text-zinc-400 truncate">
-                              {scaled.kcal} cal, {f.servingLabel}
+                              {scaled.kcal} cal, {qtyText}
                               {f.brand ? `, ${f.brand}` : ""}
                             </p>
                           </div>

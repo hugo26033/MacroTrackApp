@@ -1168,6 +1168,7 @@ export function MacroPulseApp() {
         selectedDate={selectedDate}
         foods={state.foods}
         recipes={state.recipes}
+        foodLogs={state.foodLogs}
         initialTab={quickAddTab}
         initialMealSlot={quickAddSlot}
         onAddFoodLogs={handleAddFoodLogs}
