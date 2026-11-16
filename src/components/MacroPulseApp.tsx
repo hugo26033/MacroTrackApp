@@ -52,6 +52,7 @@ import {
 } from "./Icons";
 import { QuickAddModal, QuickAddTabMode } from "./QuickAddModal";
 import { ProfileMenuModal } from "./ProfileMenuModal";
+import { FoodLogDetailModal } from "./FoodLogDetailModal";
 
 type ActiveTab = "today" | "analytics" | "fasting" | "goals";
 
@@ -98,6 +99,7 @@ export function MacroPulseApp() {
 
   // Modals & UI toggles
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<FoodLogEntry | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState<string>("");
   const [showMicronutrients, setShowMicronutrients] = useState(false);
@@ -217,6 +219,13 @@ export function MacroPulseApp() {
     setState((prev) => ({
       ...prev,
       foodLogs: prev.foodLogs.filter((l) => l.id !== id),
+    }));
+  }
+
+  function handleUpdateFoodLog(updated: FoodLogEntry) {
+    setState((prev) => ({
+      ...prev,
+      foodLogs: prev.foodLogs.map((l) => (l.id === updated.id ? updated : l)),
     }));
   }
 
@@ -724,10 +733,14 @@ export function MacroPulseApp() {
                         </div>
                       ) : !isExpanded ? (
                         <div
-                          onClick={() =>
-                            setExpandedMeals((prev) => ({ ...prev, [slot]: true }))
-                          }
-                          className="cursor-pointer pt-1 text-xs text-zinc-400 space-y-0.5"
+                          onClick={() => {
+                            if (items.length === 1) {
+                              setEditingEntry(items[0]);
+                            } else {
+                              setExpandedMeals((prev) => ({ ...prev, [slot]: true }));
+                            }
+                          }}
+                          className="cursor-pointer pt-1 text-xs text-zinc-400 space-y-0.5 hover:text-zinc-200 transition"
                         >
                           <p className="text-zinc-300 truncate">
                             {items[0].foodName}
@@ -740,7 +753,8 @@ export function MacroPulseApp() {
                           {items.map((item) => (
                             <div
                               key={item.id}
-                              className="py-2 flex items-center justify-between gap-2 text-xs"
+                              onClick={() => setEditingEntry(item)}
+                              className="cursor-pointer py-2 px-2 -mx-2 rounded-xl hover:bg-white/[0.04] flex items-center justify-between gap-2 text-xs transition"
                             >
                               <div className="min-w-0">
                                 <p className="font-medium text-zinc-200 truncate">{item.foodName}</p>
@@ -755,7 +769,10 @@ export function MacroPulseApp() {
                                 </span>
                                 <button
                                   type="button"
-                                  onClick={() => handleDeleteFoodLog(item.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteFoodLog(item.id);
+                                  }}
                                   className="text-zinc-500 hover:text-rose-400 p-1"
                                   title="Supprimer"
                                 >
@@ -1174,6 +1191,13 @@ export function MacroPulseApp() {
             waterLogs: [],
           }))
         }
+      />
+
+      <FoodLogDetailModal
+        entry={editingEntry}
+        onClose={() => setEditingEntry(null)}
+        onSave={handleUpdateFoodLog}
+        onDelete={handleDeleteFoodLog}
       />
     </div>
   );
