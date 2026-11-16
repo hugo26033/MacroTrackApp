@@ -759,7 +759,10 @@ export function MacroPulseApp() {
                               <div className="min-w-0">
                                 <p className="font-medium text-zinc-200 truncate">{item.foodName}</p>
                                 <p className="text-[11px] text-zinc-400">
-                                  {item.quantityG} g · P {item.nutrients.proteinG}g · G{" "}
+                                  {item.unitQuantity
+                                    ? `${item.unitQuantity} ${item.unitLabel || "unité"} (${item.quantityG} g)`
+                                    : `${item.quantityG} g`}{" "}
+                                  · P {item.nutrients.proteinG}g · G{" "}
                                   {item.nutrients.carbsG}g · L {item.nutrients.fatG}g
                                 </p>
                               </div>

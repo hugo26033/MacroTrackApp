@@ -62,7 +62,10 @@ export function QuickAddModal({
   const [offLoading, setOffLoading] = useState(false);
   const [offError, setOffError] = useState<string | null>(null);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
+  const [selectedQtyMode, setSelectedQtyMode] = useState<"grams" | "unit">("grams");
   const [selectedFoodQtyG, setSelectedFoodQtyG] = useState<number>(100);
+  const [selectedUnitCount, setSelectedUnitCount] = useState<number>(1);
+  const [selectedUnitWeightG, setSelectedUnitWeightG] = useState<number>(100);
 
   // Barcode state
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -86,6 +89,9 @@ export function QuickAddModal({
 
   // Manual food creation state
   const [manualName, setManualName] = useState("");
+  const [manualUnitType, setManualUnitType] = useState<"grams" | "unit">("grams");
+  const [manualUnitLabel, setManualUnitLabel] = useState("unité");
+  const [manualUnitCount, setManualUnitCount] = useState(1);
   const [manualQty, setManualQty] = useState(100);
   const [manualKcal, setManualKcal] = useState(200);
   const [manualP, setManualP] = useState(15);
@@ -465,6 +471,13 @@ export function QuickAddModal({
         brand: food.brand,
         barcode: food.barcode,
         quantityG: qty,
+        ...(food.unitType === "unit"
+          ? {
+              unitQuantity: 1,
+              unitLabel: food.unitLabel || "unité",
+              unitWeightG: qty,
+            }
+          : {}),
         nutrients: scaleNutrients(food.per100g, qty),
         source: "manual",
       },
@@ -490,12 +503,20 @@ export function QuickAddModal({
   function handleAddManualCustom(e: React.FormEvent) {
     e.preventDefault();
     if (!manualName.trim()) return;
-    const factor = 100 / Math.max(1, manualQty);
+    const isUnit = manualUnitType === "unit";
+    const baseG = Math.max(1, manualQty);
+    const factor = 100 / baseG;
+    const cleanUnitLabel = manualUnitLabel.trim() || "unité";
+    const count = isUnit ? Math.max(0.25, manualUnitCount) : 1;
+    const loggedG = Math.round(baseG * count * 10) / 10;
+
     const customFood: FoodItem = {
       id: `custom-${Date.now()}`,
       name: manualName.trim(),
-      servingSizeG: manualQty,
-      servingLabel: `${manualQty} g`,
+      servingSizeG: baseG,
+      servingLabel: isUnit ? `1 ${cleanUnitLabel} (${baseG} g)` : `${baseG} g`,
+      unitType: manualUnitType,
+      unitLabel: isUnit ? cleanUnitLabel : undefined,
       per100g: {
         kcal: Math.round(manualKcal * factor),
         proteinG: Math.round(manualP * factor * 10) / 10,
@@ -512,29 +533,45 @@ export function QuickAddModal({
         loggedAt: new Date().toISOString(),
         mealSlot,
         foodName: customFood.name,
-        quantityG: manualQty,
+        quantityG: loggedG,
+        ...(isUnit
+          ? {
+              unitQuantity: count,
+              unitLabel: cleanUnitLabel,
+              unitWeightG: baseG,
+            }
+          : {}),
         nutrients: {
-          kcal: manualKcal,
-          proteinG: manualP,
-          carbsG: manualC,
-          fatG: manualF,
-          micronutrients: { fiber_g: manualFiber },
+          kcal: Math.round(manualKcal * count),
+          proteinG: Math.round(manualP * count * 10) / 10,
+          carbsG: Math.round(manualC * count * 10) / 10,
+          fatG: Math.round(manualF * count * 10) / 10,
+          micronutrients: { fiber_g: Math.round(manualFiber * count * 10) / 10 },
         },
         source: "manual",
       },
     ]);
     setManualName("");
+    setManualUnitCount(1);
     onClose();
   }
 
   function openFoodDetails(food: FoodItem) {
+    const defaultWeight = food.servingSizeG || 100;
     setSelectedFood(food);
-    setSelectedFoodQtyG(food.servingSizeG || 100);
+    setSelectedQtyMode(food.unitType === "unit" ? "unit" : "grams");
+    setSelectedFoodQtyG(defaultWeight);
+    setSelectedUnitCount(1);
+    setSelectedUnitWeightG(defaultWeight);
   }
 
   function handleConfirmSelectedFood() {
     if (!selectedFood) return;
-    const nutrients = scaleNutrients(selectedFood.per100g, selectedFoodQtyG);
+    const isUnit = selectedQtyMode === "unit";
+    const effectiveQtyG = isUnit
+      ? Math.max(1, Math.round(selectedUnitCount * selectedUnitWeightG * 10) / 10)
+      : Math.max(1, selectedFoodQtyG);
+    const nutrients = scaleNutrients(selectedFood.per100g, effectiveQtyG);
     onSaveCustomFood(selectedFood);
     onAddFoodLogs([
       {
@@ -544,7 +581,14 @@ export function QuickAddModal({
         foodName: selectedFood.name,
         brand: selectedFood.brand,
         barcode: selectedFood.barcode,
-        quantityG: selectedFoodQtyG,
+        quantityG: effectiveQtyG,
+        ...(isUnit
+          ? {
+              unitQuantity: selectedUnitCount,
+              unitLabel: selectedFood.unitLabel || "unité",
+              unitWeightG: selectedUnitWeightG,
+            }
+          : {}),
         nutrients,
         source: selectedFood.barcode ? "barcode" : "manual",
       },
@@ -761,42 +805,122 @@ export function QuickAddModal({
                   </span>
                 </div>
 
-                {/* Quantité */}
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-zinc-400">Quantité (g) :</label>
-                    <NumberInput
-                      min={1}
-                      value={selectedFoodQtyG}
-                      onValueChange={setSelectedFoodQtyG}
-                      className="w-24 rounded-xl bg-[#0f131d] border border-white/10 px-2.5 py-1.5 text-sm font-mono text-zinc-100 focus:outline-none focus:border-blue-500"
-                    />
+                {/* Mode Grammes vs À l'unité */}
+                <div className="space-y-3">
+                  <div className="inline-flex rounded-xl bg-[#0f131d] border border-white/10 p-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedQtyMode("grams")}
+                      className={`px-3 py-1.5 rounded-lg font-medium transition ${
+                        selectedQtyMode === "grams"
+                          ? "bg-blue-500 text-white"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      Au gramme (g)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedQtyMode("unit")}
+                      className={`px-3 py-1.5 rounded-lg font-medium transition ${
+                        selectedQtyMode === "unit"
+                          ? "bg-blue-500 text-white"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      À l&apos;unité ({selectedFood.unitLabel || "unité"})
+                    </button>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    {[100, selectedFood.servingSizeG]
-                      .filter((v, i, arr) => v > 0 && arr.indexOf(v) === i)
-                      .map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => setSelectedFoodQtyG(preset)}
-                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
-                            selectedFoodQtyG === preset
-                              ? "bg-blue-500 text-white"
-                              : "bg-white/5 text-zinc-300 hover:bg-white/10"
-                          }`}
-                        >
-                          {preset === selectedFood.servingSizeG && preset !== 100
-                            ? `Portion (${preset}g)`
-                            : `${preset}g`}
-                        </button>
-                      ))}
-                  </div>
+
+                  {selectedQtyMode === "grams" ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-zinc-400">Quantité (g) :</label>
+                        <NumberInput
+                          min={1}
+                          value={selectedFoodQtyG}
+                          onValueChange={setSelectedFoodQtyG}
+                          className="w-24 rounded-xl bg-[#0f131d] border border-white/10 px-2.5 py-1.5 text-sm font-mono text-zinc-100 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {[100, selectedFood.servingSizeG]
+                          .filter((v, i, arr) => v > 0 && arr.indexOf(v) === i)
+                          .map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setSelectedFoodQtyG(preset)}
+                              className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
+                                selectedFoodQtyG === preset
+                                  ? "bg-blue-500 text-white"
+                                  : "bg-white/5 text-zinc-300 hover:bg-white/10"
+                              }`}
+                            >
+                              {preset === selectedFood.servingSizeG && preset !== 100
+                                ? `Portion (${preset}g)`
+                                : `${preset}g`}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-zinc-400">Nombre :</label>
+                          <NumberInput
+                            min={0.25}
+                            step="0.5"
+                            fallback={1}
+                            value={selectedUnitCount}
+                            onValueChange={setSelectedUnitCount}
+                            className="w-20 rounded-xl bg-[#0f131d] border border-white/10 px-2.5 py-1.5 text-sm font-mono text-zinc-100 focus:outline-none focus:border-blue-500"
+                          />
+                          <span className="text-xs text-zinc-400">
+                            {selectedFood.unitLabel || "unité(s)"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {[0.5, 1, 2, 3].map((cnt) => (
+                            <button
+                              key={cnt}
+                              type="button"
+                              onClick={() => setSelectedUnitCount(cnt)}
+                              className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
+                                selectedUnitCount === cnt
+                                  ? "bg-blue-500 text-white"
+                                  : "bg-white/5 text-zinc-300 hover:bg-white/10"
+                              }`}
+                            >
+                              {cnt}x
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-zinc-400">
+                        <span>Poids d&apos;1 {selectedFood.unitLabel || "unité"} (g) :</span>
+                        <NumberInput
+                          min={1}
+                          value={selectedUnitWeightG}
+                          onValueChange={setSelectedUnitWeightG}
+                          className="w-20 rounded-lg bg-[#0f131d] border border-white/10 px-2 py-1 text-xs font-mono text-zinc-200 focus:outline-none focus:border-blue-500"
+                        />
+                        <span className="text-zinc-500">
+                          = {Math.round(selectedUnitCount * selectedUnitWeightG * 10) / 10} g
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Macros pour la quantité */}
                 {(() => {
-                  const scaled = scaleNutrients(selectedFood.per100g, selectedFoodQtyG);
+                  const effectiveQtyG =
+                    selectedQtyMode === "unit"
+                      ? Math.max(1, Math.round(selectedUnitCount * selectedUnitWeightG * 10) / 10)
+                      : Math.max(1, selectedFoodQtyG);
+                  const scaled = scaleNutrients(selectedFood.per100g, effectiveQtyG);
                   const microEntries = MICRONUTRIENT_CATALOG.map((meta) => ({
                     meta,
                     val: scaled.micronutrients[meta.key] ?? 0,
@@ -826,7 +950,7 @@ export function QuickAddModal({
                       {microEntries.length > 0 && (
                         <div className="space-y-1.5">
                           <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
-                            Détails nutritionnels ({selectedFoodQtyG} g)
+                            Détails nutritionnels ({effectiveQtyG} g)
                           </p>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {microEntries.map(({ meta, val }) => (
@@ -1344,18 +1468,84 @@ export function QuickAddModal({
             </div>
 
             <form onSubmit={handleAddManualCustom} className="space-y-3 pt-2 border-t border-zinc-800">
-              <p className="text-xs font-medium text-zinc-400">Créer & ajouter un aliment manuel</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-medium text-zinc-400">Créer & ajouter un aliment manuel</p>
+                <div className="inline-flex rounded-xl bg-zinc-950 border border-zinc-800 p-0.5 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setManualUnitType("grams")}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition ${
+                      manualUnitType === "grams"
+                        ? "bg-emerald-500 text-zinc-950 font-semibold"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    Au gramme (g)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setManualUnitType("unit")}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition ${
+                      manualUnitType === "unit"
+                        ? "bg-emerald-500 text-zinc-950 font-semibold"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    À l&apos;unité
+                  </button>
+                </div>
+              </div>
+
               <input
                 type="text"
                 required
                 value={manualName}
                 onChange={(e) => setManualName(e.target.value)}
-                placeholder="Nom de l'aliment"
+                placeholder={
+                  manualUnitType === "unit"
+                    ? "Nom (ex: Œuf, Pomme, Banane...)"
+                    : "Nom de l'aliment"
+                }
                 className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm"
               />
+
+              {manualUnitType === "unit" && (
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <label className="space-y-1">
+                    <span className="text-zinc-400">Libellé unité</span>
+                    <input
+                      type="text"
+                      value={manualUnitLabel}
+                      onChange={(e) => setManualUnitLabel(e.target.value)}
+                      placeholder="unité, œuf, fruit..."
+                      className="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.5"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-zinc-400">Nombre à consigner</span>
+                    <NumberInput
+                      min={0.25}
+                      step="0.5"
+                      fallback={1}
+                      value={manualUnitCount}
+                      onValueChange={setManualUnitCount}
+                      className="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 font-mono"
+                    />
+                  </label>
+                </div>
+              )}
+
+              <p className="text-[11px] text-zinc-500">
+                {manualUnitType === "unit"
+                  ? `Valeurs nutritionnelles pour 1 ${manualUnitLabel.trim() || "unité"} :`
+                  : "Valeurs nutritionnelles pour la quantité indiquée :"}
+              </p>
+
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-xs">
                 <label className="space-y-1">
-                  <span className="text-zinc-400">Qté (g)</span>
+                  <span className="text-zinc-400">
+                    {manualUnitType === "unit" ? "Poids/u (g)" : "Qté (g)"}
+                  </span>
                   <NumberInput
                     min={1}
                     value={manualQty}

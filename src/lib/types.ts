@@ -87,6 +87,8 @@ export interface FoodItem {
   brand?: string;
   servingSizeG: number;
   servingLabel: string;
+  unitType?: "grams" | "unit";
+  unitLabel?: string;
   per100g: NutrientValues;
   source: "manual" | "openfoodfacts" | "gemini" | "recipe";
 }
@@ -100,6 +102,9 @@ export interface FoodLogEntry {
   brand?: string;
   barcode?: string;
   quantityG: number;
+  unitQuantity?: number;
+  unitLabel?: string;
+  unitWeightG?: number;
   nutrients: NutrientValues;
   source: LogSource;
 }
