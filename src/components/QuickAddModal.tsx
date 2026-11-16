@@ -777,32 +777,54 @@ export function QuickAddModal({
         {/* TAB 1: BARCODE */}
         {tab === "barcode" && (
           <div className="space-y-4">
-            <label className="block w-full cursor-pointer rounded-2xl border-2 border-dashed border-zinc-700 hover:border-emerald-500/60 p-4 text-center transition">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleBarcodePhotoUpload}
-                className="hidden"
-              />
-              {barcodePhotoPreview ? (
-                <img
-                  src={barcodePhotoPreview}
-                  alt="Photo du code-barres"
-                  className="mx-auto max-h-40 rounded-xl object-cover"
+            <div className="space-y-2">
+              <label className="block w-full cursor-pointer rounded-2xl border-2 border-dashed border-zinc-700 hover:border-emerald-500/60 p-4 text-center transition">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleBarcodePhotoUpload}
+                  className="hidden"
                 />
-              ) : (
-                <div className="py-3 text-xs text-zinc-400 space-y-1">
-                  <CameraIcon className="w-6 h-6 mx-auto text-emerald-400" />
-                  <p className="font-medium text-zinc-200">
-                    Prendre en photo le code-barres (IA Gemini)
-                  </p>
-                  <p className="text-[11px] text-zinc-500">
-                    Gemini lit les chiffres automatiquement et charge la fiche Open Food Facts
-                  </p>
-                </div>
-              )}
-            </label>
+                {barcodePhotoPreview ? (
+                  <img
+                    src={barcodePhotoPreview}
+                    alt="Photo du code-barres"
+                    className="mx-auto max-h-40 rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="py-3 text-xs text-zinc-400 space-y-1">
+                    <CameraIcon className="w-6 h-6 mx-auto text-emerald-400" />
+                    <p className="font-medium text-zinc-200">
+                      Photo ou image du code-barres (IA Gemini)
+                    </p>
+                    <p className="text-[11px] text-zinc-500">
+                      Gemini lit les chiffres automatiquement et charge la fiche Open Food Facts
+                    </p>
+                  </div>
+                )}
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="cursor-pointer py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-center">
+                  📷 Prendre une photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleBarcodePhotoUpload}
+                    className="hidden"
+                  />
+                </label>
+                <label className="cursor-pointer py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-center">
+                  🖼️ Importer une image
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleBarcodePhotoUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
 
             <div className="flex gap-2">
               <input
@@ -917,7 +939,6 @@ export function QuickAddModal({
                   <input
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     onChange={handlePhotoUpload}
                     className="hidden"
                   />
@@ -930,10 +951,31 @@ export function QuickAddModal({
                   ) : (
                     <div className="py-4 text-xs text-zinc-400 space-y-1">
                       <CameraIcon className="w-6 h-6 mx-auto text-emerald-400" />
-                      <p>Prendre une photo ou choisir une image de repas</p>
+                      <p>Prendre une photo ou importer une image de repas</p>
                     </div>
                   )}
                 </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="cursor-pointer py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-center">
+                    📷 Prendre une photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  <label className="cursor-pointer py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-center">
+                    🖼️ Importer depuis galerie
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
               </div>
             )}
 
