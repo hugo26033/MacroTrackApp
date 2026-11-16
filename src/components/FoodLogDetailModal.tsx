@@ -7,6 +7,7 @@ import {
   MICRONUTRIENT_CATALOG,
   MealSlot,
   NutrientValues,
+  Recipe,
   RecipeItem,
 } from "@/lib/types";
 import { TrashIcon, XIcon } from "./Icons";
@@ -14,6 +15,7 @@ import { NumberInput } from "./NumberInput";
 
 interface FoodLogDetailModalProps {
   entry: FoodLogEntry | null;
+  recipes?: Recipe[];
   onClose: () => void;
   onSave: (updated: FoodLogEntry) => void;
   onDelete: (id: string) => void;
@@ -28,6 +30,7 @@ const MEAL_SLOTS: { value: MealSlot; label: string }[] = [
 
 export function FoodLogDetailModal({
   entry,
+  recipes = [],
   onClose,
   onSave,
   onDelete,
@@ -66,8 +69,30 @@ export function FoodLogDetailModal({
     setMealSlot(entry.mealSlot);
     setTimeHHMM(entry.loggedAt.slice(11, 16) || "12:00");
     setNutrients(entry.nutrients);
-    setRecipeItems(entry.recipeItems ? entry.recipeItems.map((i) => ({ ...i })) : undefined);
-  }, [entry]);
+    if (entry.recipeItems && entry.recipeItems.length > 0) {
+      setRecipeItems(entry.recipeItems.map((i) => ({ ...i })));
+    } else if (entry.source === "recipe" && recipes.length > 0) {
+      const cleanName = entry.foodName.replace(/\s*\(1 portion\)\s*$/i, "").trim().toLowerCase();
+      const matched = recipes.find((r) => r.name.trim().toLowerCase() === cleanName);
+      if (matched && matched.items.length > 0) {
+        const totalRecipeG = Math.max(
+          1,
+          matched.items.reduce((s, i) => s + i.quantityG, 0)
+        );
+        const ratio = (entry.quantityG || totalRecipeG) / totalRecipeG;
+        setRecipeItems(
+          matched.items.map((i) => ({
+            ...i,
+            quantityG: round1(i.quantityG * ratio),
+          }))
+        );
+      } else {
+        setRecipeItems(undefined);
+      }
+    } else {
+      setRecipeItems(undefined);
+    }
+  }, [entry, recipes]);
 
   if (!entry) return null;
 

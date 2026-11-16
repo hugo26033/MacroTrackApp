@@ -1170,6 +1170,7 @@ export function MacroPulseApp() {
 
       <FoodLogDetailModal
         entry={editingEntry}
+        recipes={state.recipes}
         onClose={() => setEditingEntry(null)}
         onSave={handleUpdateFoodLog}
         onDelete={handleDeleteFoodLog}
