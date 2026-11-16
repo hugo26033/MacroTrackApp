@@ -16,6 +16,7 @@ import {
   BarcodeIcon,
   CameraIcon,
   ChevronDownIcon,
+  PencilIcon,
   PlusIcon,
   SearchIcon,
   SparklesIcon,
@@ -109,6 +110,7 @@ export function QuickAddModal({
 
   // Recipe creation & adjustment state
   const [creatingRecipe, setCreatingRecipe] = useState(false);
+  const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
   const [recipeName, setRecipeName] = useState("");
   const [recipeServings, setRecipeServings] = useState(1);
   const [recipeDraftItems, setRecipeDraftItems] = useState<RecipeItem[]>([]);
@@ -634,18 +636,29 @@ export function QuickAddModal({
     onClose();
   }
 
+  function startEditingRecipe(recipe: Recipe) {
+    setEditingRecipeId(recipe.id);
+    setRecipeName(recipe.name);
+    setRecipeServings(recipe.servings);
+    setRecipeDraftItems(recipe.items.map((item) => ({ ...item })));
+    setRecipeIngSearch("");
+    setSelectedRecipe(null);
+    setCreatingRecipe(true);
+  }
+
   function handleSaveNewRecipe(e: React.FormEvent) {
     e.preventDefault();
     if (!recipeName.trim() || recipeDraftItems.length === 0 || !onSaveRecipe) return;
     const { perServing } = computeRecipeTotals(recipeDraftItems, recipeServings);
-    const newRecipe: Recipe = {
-      id: `recipe-${Date.now()}`,
+    const savedRecipe: Recipe = {
+      id: editingRecipeId ?? `recipe-${Date.now()}`,
       name: recipeName.trim(),
       servings: Math.max(1, recipeServings),
       items: recipeDraftItems,
       perServing,
     };
-    onSaveRecipe(newRecipe);
+    onSaveRecipe(savedRecipe);
+    setEditingRecipeId(null);
     setRecipeName("");
     setRecipeServings(1);
     setRecipeDraftItems([]);
@@ -931,10 +944,15 @@ export function QuickAddModal({
                     className="rounded-2xl bg-[#181d2a] border border-white/10 p-4 space-y-4"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-zinc-100">Créer une recette</h3>
+                      <h3 className="text-sm font-semibold text-zinc-100">
+                        {editingRecipeId ? "Modifier la recette" : "Créer une recette"}
+                      </h3>
                       <button
                         type="button"
-                        onClick={() => setCreatingRecipe(false)}
+                        onClick={() => {
+                          setCreatingRecipe(false);
+                          setEditingRecipeId(null);
+                        }}
                         className="text-xs text-zinc-400 hover:text-zinc-200"
                       >
                         Annuler
@@ -1140,20 +1158,31 @@ export function QuickAddModal({
                   </form>
                 ) : selectedRecipe ? (
                   <div className="rounded-2xl bg-[#181d2a] border border-white/10 p-4 space-y-4">
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRecipe(null)}
-                        className="text-xs text-blue-400 hover:underline mb-1.5 inline-flex items-center gap-1"
-                      >
-                        ← Retour aux recettes
-                      </button>
-                      <h3 className="text-base font-semibold text-zinc-100">
-                        {selectedRecipe.name}
-                      </h3>
-                      <p className="text-xs text-zinc-400">
-                        Ajuste les quantités réellement utilisées pour ce repas
-                      </p>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRecipe(null)}
+                          className="text-xs text-blue-400 hover:underline mb-1.5 inline-flex items-center gap-1"
+                        >
+                          ← Retour aux recettes
+                        </button>
+                        <h3 className="text-base font-semibold text-zinc-100">
+                          {selectedRecipe.name}
+                        </h3>
+                        <p className="text-xs text-zinc-400">
+                          Ajuste les quantités réellement utilisées pour ce repas
+                        </p>
+                      </div>
+                      {onSaveRecipe && (
+                        <button
+                          type="button"
+                          onClick={() => startEditingRecipe(selectedRecipe)}
+                          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs text-blue-400 font-medium"
+                        >
+                          <PencilIcon className="w-3.5 h-3.5" /> Modifier
+                        </button>
+                      )}
                     </div>
 
                     {/* Portions à consigner */}
@@ -1324,6 +1353,10 @@ export function QuickAddModal({
                           <button
                             type="button"
                             onClick={() => {
+                              setEditingRecipeId(null);
+                              setRecipeName("");
+                              setRecipeServings(1);
+                              setRecipeDraftItems([]);
                               setCreatingRecipe(true);
                               setSelectedRecipe(null);
                             }}
@@ -1352,6 +1385,19 @@ export function QuickAddModal({
                                 </p>
                               </div>
                               <div className="flex items-center gap-1.5 shrink-0">
+                                {onSaveRecipe && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      startEditingRecipe(r);
+                                    }}
+                                    className="w-8 h-8 rounded-full bg-white/5 hover:bg-blue-500/20 text-zinc-400 hover:text-blue-400 flex items-center justify-center transition"
+                                    title="Modifier cette recette"
+                                  >
+                                    <PencilIcon className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
                                 {onDeleteRecipe && (
                                   <button
                                     type="button"
