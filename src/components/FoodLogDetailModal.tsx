@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { round1, scaleNutrients } from "@/lib/calculations";
+import { round1, scaleNutrients, sumNutrients } from "@/lib/calculations";
 import {
   FoodLogEntry,
   MICRONUTRIENT_CATALOG,
   MealSlot,
   NutrientValues,
+  RecipeItem,
 } from "@/lib/types";
 import { TrashIcon, XIcon } from "./Icons";
 import { NumberInput } from "./NumberInput";
@@ -42,6 +43,7 @@ export function FoodLogDetailModal({
     micronutrients: {},
   });
   const [per100gBase, setPer100gBase] = useState<NutrientValues | null>(null);
+  const [recipeItems, setRecipeItems] = useState<RecipeItem[] | undefined>(undefined);
 
   useEffect(() => {
     if (!entry) return;
@@ -64,16 +66,40 @@ export function FoodLogDetailModal({
     setMealSlot(entry.mealSlot);
     setTimeHHMM(entry.loggedAt.slice(11, 16) || "12:00");
     setNutrients(entry.nutrients);
+    setRecipeItems(entry.recipeItems ? entry.recipeItems.map((i) => ({ ...i })) : undefined);
   }, [entry]);
 
   if (!entry) return null;
 
   function applyQuantity(newQty: number) {
     const safeQty = Math.max(1, Math.round(newQty * 10) / 10);
+    if (recipeItems && recipeItems.length > 0 && quantityG > 0) {
+      const ratio = safeQty / quantityG;
+      const scaledItems = recipeItems.map((item) => ({
+        ...item,
+        quantityG: round1(item.quantityG * ratio),
+      }));
+      setRecipeItems(scaledItems);
+      setQuantityG(safeQty);
+      setNutrients(sumNutrients(scaledItems.map((i) => scaleNutrients(i.per100g, i.quantityG))));
+      return;
+    }
     setQuantityG(safeQty);
     if (per100gBase) {
       setNutrients(scaleNutrients(per100gBase, safeQty));
     }
+  }
+
+  function updateRecipeIngredient(idx: number, patch: Partial<RecipeItem>) {
+    if (!recipeItems) return;
+    const nextItems = recipeItems.map((item, i) => (i === idx ? { ...item, ...patch } : item));
+    const totalG = Math.max(1, round1(nextItems.reduce((s, i) => s + i.quantityG, 0)));
+    const nextNutrients = sumNutrients(
+      nextItems.map((i) => scaleNutrients(i.per100g, i.quantityG))
+    );
+    setRecipeItems(nextItems);
+    setQuantityG(totalG);
+    setNutrients(nextNutrients);
   }
 
   function handleSave(e: React.FormEvent) {
@@ -83,6 +109,7 @@ export function FoodLogDetailModal({
     onSave({
       ...entry,
       quantityG,
+      ...(recipeItems ? { recipeItems } : {}),
       mealSlot,
       loggedAt: updatedLoggedAt,
       nutrients,
@@ -158,6 +185,73 @@ export function FoodLogDetailModal({
             ))}
           </div>
         </div>
+
+        {/* Ingrédients ajustables si recette */}
+        {recipeItems && recipeItems.length > 0 && (
+          <div className="rounded-2xl bg-[#0f131d] border border-white/[0.06] p-4 space-y-2.5">
+            <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
+              Ingrédients de la recette
+            </p>
+            <div className="space-y-2">
+              {recipeItems.map((ing, idx) => {
+                const isUnit = ing.unitType === "unit";
+                const unitWeight = ing.unitWeightG || 100;
+                const unitCount = Math.round((ing.quantityG / unitWeight) * 100) / 100;
+                return (
+                  <div
+                    key={`${ing.foodName}-${idx}`}
+                    className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#181d2a] border border-white/[0.05] text-xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="truncate block text-zinc-200">{ing.foodName}</span>
+                      {isUnit && (
+                        <span className="text-[10px] text-zinc-500">
+                          1 {ing.unitLabel || "u"} = {unitWeight} g ({ing.quantityG} g)
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateRecipeIngredient(idx, {
+                            unitType: isUnit ? "grams" : "unit",
+                            unitWeightG: ing.unitWeightG || 100,
+                          })
+                        }
+                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[10px] font-medium text-blue-400"
+                        title="Basculer grammes / unité"
+                      >
+                        {isUnit ? ing.unitLabel || "unité" : "g"}
+                      </button>
+                      {isUnit ? (
+                        <NumberInput
+                          min={0}
+                          step="0.5"
+                          fallback={0}
+                          value={unitCount}
+                          onValueChange={(cnt) =>
+                            updateRecipeIngredient(idx, {
+                              quantityG: Math.round(cnt * unitWeight * 10) / 10,
+                            })
+                          }
+                          className="w-20 rounded-lg bg-[#0f131d] border border-white/10 px-2 py-1 text-right font-mono text-zinc-100"
+                        />
+                      ) : (
+                        <NumberInput
+                          min={0}
+                          value={ing.quantityG}
+                          onValueChange={(qty) => updateRecipeIngredient(idx, { quantityG: qty })}
+                          className="w-20 rounded-lg bg-[#0f131d] border border-white/10 px-2 py-1 text-right font-mono text-zinc-100"
+                        />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Résumé Calories & Macros */}
         <div className="grid grid-cols-4 gap-2 text-center">

@@ -569,8 +569,13 @@ export function QuickAddModal({
   }
 
   function handleAddRecipe(recipe: Recipe) {
+    const servings = Math.max(1, recipe.servings);
     const totalG = recipe.items.reduce((s, i) => s + i.quantityG, 0);
-    const onePortionG = Math.max(1, Math.round((totalG / Math.max(1, recipe.servings)) * 10) / 10);
+    const onePortionG = Math.max(1, Math.round((totalG / servings) * 10) / 10);
+    const consumedItems: RecipeItem[] = recipe.items.map((item) => ({
+      ...item,
+      quantityG: Math.round((item.quantityG / servings) * 10) / 10,
+    }));
     onAddFoodLogs([
       {
         logDate: selectedDate,
@@ -581,6 +586,7 @@ export function QuickAddModal({
         unitQuantity: 1,
         unitLabel: "portion",
         unitWeightG: onePortionG,
+        recipeItems: consumedItems,
         nutrients: recipe.perServing,
         source: "recipe",
       },
@@ -612,6 +618,12 @@ export function QuickAddModal({
           Math.round(v * safePortions * 10) / 10;
       }
     }
+    const servings = Math.max(1, selectedRecipe.servings);
+    const ratio = safePortions / servings;
+    const consumedItems: RecipeItem[] = adjustedRecipeItems.map((item) => ({
+      ...item,
+      quantityG: Math.round(item.quantityG * ratio * 10) / 10,
+    }));
     onAddFoodLogs([
       {
         logDate: selectedDate,
@@ -622,6 +634,7 @@ export function QuickAddModal({
         unitQuantity: safePortions,
         unitLabel: "portion",
         unitWeightG: Math.round(onePortionG * 10) / 10,
+        recipeItems: consumedItems,
         nutrients: {
           kcal: Math.round(perServing.kcal * safePortions),
           proteinG: Math.round(perServing.proteinG * safePortions * 10) / 10,

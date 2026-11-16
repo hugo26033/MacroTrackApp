@@ -105,6 +105,7 @@ export interface FoodLogEntry {
   unitQuantity?: number;
   unitLabel?: string;
   unitWeightG?: number;
+  recipeItems?: RecipeItem[];
   nutrients: NutrientValues;
   source: LogSource;
 }
