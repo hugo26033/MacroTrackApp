@@ -221,7 +221,86 @@ export function GoalsTdeeView({
 
       {/* Objectifs précis Kcal, Macros, Pas, Eau */}
       <section className="rounded-3xl bg-zinc-900/80 border border-zinc-800 p-5 space-y-4">
-        <h3 className="font-semibold text-sm sm:text-base">Objectifs quotidiens précis</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold text-sm sm:text-base">Objectifs quotidiens précis</h3>
+          {(() => {
+            const pKcal = Math.round(goals.proteinG * 4);
+            const cKcal = Math.round(goals.carbsG * 4);
+            const fKcal = Math.round(goals.fatG * 9);
+            const macroTotal = pKcal + cKcal + fKcal;
+            if (macroTotal === goals.targetKcal) return null;
+            return (
+              <button
+                type="button"
+                onClick={() => onUpdateGoals({ targetKcal: macroTotal })}
+                className="px-3 py-1 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-medium hover:bg-blue-500/25"
+              >
+                Aligner kcal sur macros ({macroTotal.toLocaleString("fr-FR")} kcal)
+              </button>
+            );
+          })()}
+        </div>
+
+        {/* Jauge kcal remplie par les macros (4 / 4 / 9) */}
+        {(() => {
+          const pKcal = Math.round(goals.proteinG * 4);
+          const cKcal = Math.round(goals.carbsG * 4);
+          const fKcal = Math.round(goals.fatG * 9);
+          const macroTotal = pKcal + cKcal + fKcal;
+          const denom = Math.max(1, goals.targetKcal);
+          const cPct = Math.min(100, (cKcal / denom) * 100);
+          const fPct = Math.min(Math.max(0, 100 - cPct), (fKcal / denom) * 100);
+          const pPct = Math.min(Math.max(0, 100 - cPct - fPct), (pKcal / denom) * 100);
+          const diff = goals.targetKcal - macroTotal;
+
+          return (
+            <div className="rounded-2xl bg-zinc-950 border border-zinc-800 p-3.5 space-y-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs">
+                <span className="text-zinc-400">
+                  Remplissage par les macros :{" "}
+                  <strong className="font-mono text-zinc-100">
+                    {macroTotal.toLocaleString("fr-FR")}
+                  </strong>{" "}
+                  / {goals.targetKcal.toLocaleString("fr-FR")} kcal
+                </span>
+                <span
+                  className={`font-mono font-semibold ${
+                    diff === 0
+                      ? "text-emerald-400"
+                      : diff > 0
+                        ? "text-sky-400"
+                        : "text-rose-400"
+                  }`}
+                >
+                  {diff === 0
+                    ? "100% équilibré"
+                    : diff > 0
+                      ? `Reste ${diff.toLocaleString("fr-FR")} kcal`
+                      : `+${Math.abs(diff).toLocaleString("fr-FR")} kcal au-dessus`}
+                </span>
+              </div>
+
+              <div className="h-2.5 rounded-full bg-zinc-900 overflow-hidden flex">
+                <div className="h-full bg-teal-400 transition-all" style={{ width: `${cPct}%` }} />
+                <div className="h-full bg-purple-400 transition-all" style={{ width: `${fPct}%` }} />
+                <div className="h-full bg-amber-400 transition-all" style={{ width: `${pPct}%` }} />
+              </div>
+
+              <div className="flex flex-wrap gap-3 text-[11px] text-zinc-400">
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-teal-400" /> Glucides {cKcal} kcal
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-purple-400" /> Lipides {fKcal} kcal
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" /> Protéines {pKcal} kcal
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
           <label className="space-y-1">
             <span className="text-zinc-400">Calories cibles (kcal)</span>
