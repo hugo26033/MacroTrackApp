@@ -2,12 +2,13 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { scaleNutrients } from "@/lib/calculations";
-import type {
-  FoodItem,
-  FoodLogEntry,
-  GeminiDetectedFood,
-  MealSlot,
-  Recipe,
+import {
+  MICRONUTRIENT_CATALOG,
+  type FoodItem,
+  type FoodLogEntry,
+  type GeminiDetectedFood,
+  type MealSlot,
+  type Recipe,
 } from "@/lib/types";
 import {
   BarcodeIcon,
@@ -59,6 +60,8 @@ export function QuickAddModal({
   const [offResults, setOffResults] = useState<FoodItem[]>([]);
   const [offLoading, setOffLoading] = useState(false);
   const [offError, setOffError] = useState<string | null>(null);
+  const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
+  const [selectedFoodQtyG, setSelectedFoodQtyG] = useState<number>(100);
 
   // Barcode state
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -138,6 +141,7 @@ export function QuickAddModal({
       setMealSlot(initialMealSlot);
       setSearchQuery("");
       setBrandQuery("");
+      setSelectedFood(null);
     } else {
       stopCamera();
     }
@@ -522,6 +526,32 @@ export function QuickAddModal({
     onClose();
   }
 
+  function openFoodDetails(food: FoodItem) {
+    setSelectedFood(food);
+    setSelectedFoodQtyG(food.servingSizeG || 100);
+  }
+
+  function handleConfirmSelectedFood() {
+    if (!selectedFood) return;
+    const nutrients = scaleNutrients(selectedFood.per100g, selectedFoodQtyG);
+    onSaveCustomFood(selectedFood);
+    onAddFoodLogs([
+      {
+        logDate: selectedDate,
+        loggedAt: new Date().toISOString(),
+        mealSlot,
+        foodName: selectedFood.name,
+        brand: selectedFood.brand,
+        barcode: selectedFood.barcode,
+        quantityG: selectedFoodQtyG,
+        nutrients,
+        source: selectedFood.barcode ? "barcode" : "manual",
+      },
+    ]);
+    setSelectedFood(null);
+    onClose();
+  }
+
   if (!open) return null;
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -582,6 +612,7 @@ export function QuickAddModal({
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
+                setSelectedFood(null);
                 if (tab !== "all" && tab !== "foods" && tab !== "recipes") {
                   setTab("all");
                 }
@@ -606,6 +637,7 @@ export function QuickAddModal({
               value={brandQuery}
               onChange={(e) => {
                 setBrandQuery(e.target.value);
+                setSelectedFood(null);
                 if (tab !== "all" && tab !== "foods") {
                   setTab("all");
                 }
@@ -707,11 +739,129 @@ export function QuickAddModal({
               </div>
             )}
 
-            {(tab === "all" || tab === "foods") && (
+            {(tab === "all" || tab === "foods") && selectedFood && (
+              <div className="rounded-2xl bg-[#181d2a] border border-white/10 p-4 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFood(null)}
+                      className="text-xs text-blue-400 hover:underline mb-1.5 inline-flex items-center gap-1"
+                    >
+                      ← Retour aux résultats
+                    </button>
+                    <h3 className="text-base font-semibold text-zinc-100">{selectedFood.name}</h3>
+                    {selectedFood.brand && (
+                      <p className="text-xs text-zinc-400">{selectedFood.brand}</p>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full">
+                    {selectedFood.per100g.kcal} kcal / 100g
+                  </span>
+                </div>
+
+                {/* Quantité */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-zinc-400">Quantité (g) :</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={selectedFoodQtyG}
+                      onChange={(e) => setSelectedFoodQtyG(Math.max(1, Number(e.target.value)))}
+                      className="w-24 rounded-xl bg-[#0f131d] border border-white/10 px-2.5 py-1.5 text-sm font-mono text-zinc-100 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {[100, selectedFood.servingSizeG]
+                      .filter((v, i, arr) => v > 0 && arr.indexOf(v) === i)
+                      .map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setSelectedFoodQtyG(preset)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
+                            selectedFoodQtyG === preset
+                              ? "bg-blue-500 text-white"
+                              : "bg-white/5 text-zinc-300 hover:bg-white/10"
+                          }`}
+                        >
+                          {preset === selectedFood.servingSizeG && preset !== 100
+                            ? `Portion (${preset}g)`
+                            : `${preset}g`}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Macros pour la quantité */}
+                {(() => {
+                  const scaled = scaleNutrients(selectedFood.per100g, selectedFoodQtyG);
+                  const microEntries = MICRONUTRIENT_CATALOG.map((meta) => ({
+                    meta,
+                    val: scaled.micronutrients[meta.key] ?? 0,
+                  })).filter((entry) => entry.val > 0);
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-4 gap-2 text-center text-xs bg-[#0f131d] p-3 rounded-xl border border-white/[0.06]">
+                        <div>
+                          <div className="text-zinc-400">Calories</div>
+                          <div className="font-semibold text-blue-400 text-sm mt-0.5">{scaled.kcal}</div>
+                        </div>
+                        <div>
+                          <div className="text-zinc-400">Protéines</div>
+                          <div className="font-semibold text-amber-400 text-sm mt-0.5">{scaled.proteinG} g</div>
+                        </div>
+                        <div>
+                          <div className="text-zinc-400">Glucides</div>
+                          <div className="font-semibold text-teal-400 text-sm mt-0.5">{scaled.carbsG} g</div>
+                        </div>
+                        <div>
+                          <div className="text-zinc-400">Lipides</div>
+                          <div className="font-semibold text-purple-400 text-sm mt-0.5">{scaled.fatG} g</div>
+                        </div>
+                      </div>
+
+                      {microEntries.length > 0 && (
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
+                            Détails nutritionnels ({selectedFoodQtyG} g)
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {microEntries.map(({ meta, val }) => (
+                              <div
+                                key={meta.key}
+                                className="flex items-center justify-between px-3 py-2 rounded-xl bg-[#0f131d] border border-white/[0.05] text-xs"
+                              >
+                                <span className="text-zinc-400 truncate pr-2">{meta.label}</span>
+                                <span className="font-mono text-zinc-200 shrink-0">
+                                  {val} {meta.unit}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+
+                <button
+                  type="button"
+                  onClick={handleConfirmSelectedFood}
+                  className="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-semibold text-sm transition"
+                >
+                  Ajouter au journal
+                </button>
+              </div>
+            )}
+
+            {(tab === "all" || tab === "foods") && !selectedFood && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-zinc-100">
-                    {normalizedQuery ? "Résultats" : "Récemment consignés"}
+                    {normalizedQuery || normalizedBrand ? "Résultats" : "Récemment consignés"}
                   </h3>
                   <button
                     type="button"
@@ -732,7 +882,8 @@ export function QuickAddModal({
                       return (
                         <div
                           key={f.id}
-                          className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#181d2a] border border-white/[0.06]"
+                          onClick={() => openFoodDetails(f)}
+                          className="cursor-pointer flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#181d2a] hover:bg-[#1f2535] border border-white/[0.06] transition"
                         >
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-zinc-100 truncate">{f.name}</p>
@@ -743,7 +894,10 @@ export function QuickAddModal({
                           </div>
                           <button
                             type="button"
-                            onClick={() => handleAddSavedFood(f)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddSavedFood(f);
+                            }}
                             className="shrink-0 w-9 h-9 rounded-full bg-[#242b3d] hover:bg-blue-500 text-blue-400 hover:text-white flex items-center justify-center transition"
                             title="Consigner cet aliment"
                           >
@@ -755,7 +909,7 @@ export function QuickAddModal({
                   </div>
                 )}
 
-                {normalizedQuery.length >= 2 && (
+                {(normalizedQuery.length >= 2 || normalizedBrand.length >= 2) && (
                   <div className="pt-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
@@ -770,7 +924,7 @@ export function QuickAddModal({
                     )}
                     {!offLoading && !offError && offResults.length === 0 && (
                       <p className="text-xs text-zinc-500 py-2">
-                        Aucun produit trouvé sur Open Food Facts pour « {searchQuery.trim()} ».
+                        Aucun produit trouvé sur Open Food Facts pour « {[searchQuery.trim(), brandQuery.trim()].filter(Boolean).join(" · ")} ».
                       </p>
                     )}
                     <div className="space-y-2">
@@ -779,7 +933,8 @@ export function QuickAddModal({
                         return (
                           <div
                             key={f.id}
-                            className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#181d2a] border border-white/[0.06]"
+                            onClick={() => openFoodDetails(f)}
+                            className="cursor-pointer flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#181d2a] hover:bg-[#1f2535] border border-white/[0.06] transition"
                           >
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-zinc-100 truncate">{f.name}</p>
@@ -790,7 +945,8 @@ export function QuickAddModal({
                             </div>
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 onSaveCustomFood(f);
                                 handleAddSavedFood(f);
                               }}
