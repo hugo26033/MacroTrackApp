@@ -1,14 +1,16 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { scaleNutrients } from "@/lib/calculations";
+import { scaleNutrients, sumNutrients } from "@/lib/calculations";
 import {
   MICRONUTRIENT_CATALOG,
   type FoodItem,
   type FoodLogEntry,
   type GeminiDetectedFood,
   type MealSlot,
+  type NutrientValues,
   type Recipe,
+  type RecipeItem,
 } from "@/lib/types";
 import {
   BarcodeIcon,
@@ -34,6 +36,8 @@ interface QuickAddModalProps {
   initialMealSlot?: MealSlot;
   onAddFoodLogs: (logs: Omit<FoodLogEntry, "id">[]) => void;
   onSaveCustomFood: (food: FoodItem) => void;
+  onSaveRecipe?: (recipe: Recipe) => void;
+  onDeleteRecipe?: (id: string) => void;
 }
 
 const MEAL_SLOTS: { value: MealSlot; label: string }[] = [
@@ -53,6 +57,8 @@ export function QuickAddModal({
   initialMealSlot = "lunch",
   onAddFoodLogs,
   onSaveCustomFood,
+  onSaveRecipe,
+  onDeleteRecipe,
 }: QuickAddModalProps) {
   const [tab, setTab] = useState<QuickAddTabMode>(initialTab);
   const [mealSlot, setMealSlot] = useState<MealSlot>(initialMealSlot);
@@ -98,6 +104,16 @@ export function QuickAddModal({
   const [manualC, setManualC] = useState(20);
   const [manualF, setManualF] = useState(6);
   const [manualFiber, setManualFiber] = useState(2);
+
+  // Recipe creation & adjustment state
+  const [creatingRecipe, setCreatingRecipe] = useState(false);
+  const [recipeName, setRecipeName] = useState("");
+  const [recipeServings, setRecipeServings] = useState(1);
+  const [recipeDraftItems, setRecipeDraftItems] = useState<RecipeItem[]>([]);
+  const [recipeIngSearch, setRecipeIngSearch] = useState("");
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [adjustedRecipeItems, setAdjustedRecipeItems] = useState<RecipeItem[]>([]);
+  const [recipePortionsToLog, setRecipePortionsToLog] = useState(1);
 
   useEffect(() => {
     const q = searchQuery.trim();
@@ -149,6 +165,8 @@ export function QuickAddModal({
       setSearchQuery("");
       setBrandQuery("");
       setSelectedFood(null);
+      setCreatingRecipe(false);
+      setSelectedRecipe(null);
     } else {
       stopCamera();
     }
@@ -485,19 +503,115 @@ export function QuickAddModal({
     onClose();
   }
 
+  function computeRecipeTotals(items: RecipeItem[], servings: number): {
+    totalG: number;
+    total: NutrientValues;
+    perServing: NutrientValues;
+  } {
+    const safeServings = Math.max(1, servings);
+    const totalG = Math.round(items.reduce((s, i) => s + i.quantityG, 0) * 10) / 10;
+    const total = sumNutrients(items.map((i) => scaleNutrients(i.per100g, i.quantityG)));
+    const microsPerServing: NutrientValues["micronutrients"] = {};
+    for (const [k, v] of Object.entries(total.micronutrients)) {
+      if (typeof v === "number") {
+        microsPerServing[k as keyof NutrientValues["micronutrients"]] =
+          Math.round((v / safeServings) * 10) / 10;
+      }
+    }
+    const perServing: NutrientValues = {
+      kcal: Math.round(total.kcal / safeServings),
+      proteinG: Math.round((total.proteinG / safeServings) * 10) / 10,
+      carbsG: Math.round((total.carbsG / safeServings) * 10) / 10,
+      fatG: Math.round((total.fatG / safeServings) * 10) / 10,
+      micronutrients: microsPerServing,
+    };
+    return { totalG, total, perServing };
+  }
+
   function handleAddRecipe(recipe: Recipe) {
+    const totalG = recipe.items.reduce((s, i) => s + i.quantityG, 0);
+    const onePortionG = Math.max(1, Math.round((totalG / Math.max(1, recipe.servings)) * 10) / 10);
     onAddFoodLogs([
       {
         logDate: selectedDate,
         loggedAt: new Date().toISOString(),
         mealSlot,
-        foodName: `${recipe.name} (1 portion)`,
-        quantityG: recipe.items.reduce((s, i) => s + i.quantityG, 0) / Math.max(1, recipe.servings),
+        foodName: recipe.name,
+        quantityG: onePortionG,
+        unitQuantity: 1,
+        unitLabel: "portion",
+        unitWeightG: onePortionG,
         nutrients: recipe.perServing,
         source: "recipe",
       },
     ]);
     onClose();
+  }
+
+  function openRecipeDetails(recipe: Recipe) {
+    setSelectedRecipe(recipe);
+    setAdjustedRecipeItems(recipe.items.map((item) => ({ ...item })));
+    setRecipePortionsToLog(1);
+    setCreatingRecipe(false);
+  }
+
+  function handleConfirmAdjustedRecipe() {
+    if (!selectedRecipe) return;
+    const { totalG, perServing } = computeRecipeTotals(
+      adjustedRecipeItems,
+      selectedRecipe.servings
+    );
+    const safePortions = Math.max(0.25, recipePortionsToLog);
+    const onePortionG = Math.max(1, totalG / Math.max(1, selectedRecipe.servings));
+    const loggedG = Math.max(1, Math.round(onePortionG * safePortions * 10) / 10);
+    const scaledMicros: NutrientValues["micronutrients"] = {};
+    for (const [k, v] of Object.entries(perServing.micronutrients)) {
+      if (typeof v === "number") {
+        scaledMicros[k as keyof NutrientValues["micronutrients"]] =
+          Math.round(v * safePortions * 10) / 10;
+      }
+    }
+    onAddFoodLogs([
+      {
+        logDate: selectedDate,
+        loggedAt: new Date().toISOString(),
+        mealSlot,
+        foodName: selectedRecipe.name,
+        quantityG: loggedG,
+        unitQuantity: safePortions,
+        unitLabel: "portion",
+        unitWeightG: Math.round(onePortionG * 10) / 10,
+        nutrients: {
+          kcal: Math.round(perServing.kcal * safePortions),
+          proteinG: Math.round(perServing.proteinG * safePortions * 10) / 10,
+          carbsG: Math.round(perServing.carbsG * safePortions * 10) / 10,
+          fatG: Math.round(perServing.fatG * safePortions * 10) / 10,
+          micronutrients: scaledMicros,
+        },
+        source: "recipe",
+      },
+    ]);
+    setSelectedRecipe(null);
+    onClose();
+  }
+
+  function handleSaveNewRecipe(e: React.FormEvent) {
+    e.preventDefault();
+    if (!recipeName.trim() || recipeDraftItems.length === 0 || !onSaveRecipe) return;
+    const { perServing } = computeRecipeTotals(recipeDraftItems, recipeServings);
+    const newRecipe: Recipe = {
+      id: `recipe-${Date.now()}`,
+      name: recipeName.trim(),
+      servings: Math.max(1, recipeServings),
+      items: recipeDraftItems,
+      perServing,
+    };
+    onSaveRecipe(newRecipe);
+    setRecipeName("");
+    setRecipeServings(1);
+    setRecipeDraftItems([]);
+    setRecipeIngSearch("");
+    setCreatingRecipe(false);
   }
 
   function handleAddManualCustom(e: React.FormEvent) {
@@ -755,32 +869,358 @@ export function QuickAddModal({
               </div>
             )}
 
-            {(tab === "all" || tab === "recipes") && filteredRecipes.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-zinc-100">Mes recettes</h3>
-                <div className="space-y-2">
-                  {filteredRecipes.map((r) => (
-                    <div
-                      key={r.id}
-                      className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#181d2a] border border-white/[0.06]"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-zinc-100 truncate">{r.name}</p>
-                        <p className="text-xs text-zinc-400">
-                          {r.perServing.kcal} cal, 1 portion (P {r.perServing.proteinG}g · G {r.perServing.carbsG}g · L {r.perServing.fatG}g)
-                        </p>
-                      </div>
+            {(tab === "all" || tab === "recipes") && !selectedFood && (
+              <div className="space-y-3">
+                {creatingRecipe ? (
+                  <form
+                    onSubmit={handleSaveNewRecipe}
+                    className="rounded-2xl bg-[#181d2a] border border-white/10 p-4 space-y-4"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold text-zinc-100">Créer une recette</h3>
                       <button
                         type="button"
-                        onClick={() => handleAddRecipe(r)}
-                        className="shrink-0 w-9 h-9 rounded-full bg-[#242b3d] hover:bg-blue-500 text-blue-400 hover:text-white flex items-center justify-center transition"
-                        title="Ajouter cette recette"
+                        onClick={() => setCreatingRecipe(false)}
+                        className="text-xs text-zinc-400 hover:text-zinc-200"
                       >
-                        <PlusIcon className="w-4 h-4" />
+                        Annuler
                       </button>
                     </div>
-                  ))}
-                </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                      <label className="space-y-1 sm:col-span-2">
+                        <span className="text-zinc-400">Nom de la recette</span>
+                        <input
+                          type="text"
+                          required
+                          value={recipeName}
+                          onChange={(e) => setRecipeName(e.target.value)}
+                          placeholder="Ex: Porridge protéiné, Bowl poulet..."
+                          className="w-full rounded-xl bg-[#0f131d] border border-white/10 px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-zinc-400">Nombre de portions</span>
+                        <NumberInput
+                          min={1}
+                          fallback={1}
+                          value={recipeServings}
+                          onValueChange={setRecipeServings}
+                          className="w-full rounded-xl bg-[#0f131d] border border-white/10 px-3 py-2 text-sm font-mono text-zinc-100 focus:outline-none focus:border-blue-500"
+                        />
+                      </label>
+                    </div>
+
+                    {/* Ajouter des ingrédients depuis mes aliments */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-zinc-400">
+                        Ajouter un ingrédient (depuis tes aliments)
+                      </p>
+                      <input
+                        type="text"
+                        value={recipeIngSearch}
+                        onChange={(e) => setRecipeIngSearch(e.target.value)}
+                        placeholder="Filtrer mes aliments..."
+                        className="w-full rounded-xl bg-[#0f131d] border border-white/10 px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-blue-500"
+                      />
+                      <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                        {foods
+                          .filter(
+                            (f) =>
+                              !recipeIngSearch.trim() ||
+                              f.name.toLowerCase().includes(recipeIngSearch.trim().toLowerCase())
+                          )
+                          .slice(0, 12)
+                          .map((f) => (
+                            <button
+                              key={f.id}
+                              type="button"
+                              onClick={() =>
+                                setRecipeDraftItems((prev) => [
+                                  ...prev,
+                                  {
+                                    foodName: f.name,
+                                    quantityG: f.servingSizeG || 100,
+                                    per100g: f.per100g,
+                                  },
+                                ])
+                              }
+                              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#0f131d] hover:bg-white/[0.06] border border-white/[0.05] text-left text-xs transition"
+                            >
+                              <span className="truncate text-zinc-200">{f.name}</span>
+                              <span className="shrink-0 text-blue-400 font-medium">
+                                + {f.servingSizeG || 100}g
+                              </span>
+                            </button>
+                          ))}
+                        {foods.length === 0 && (
+                          <p className="text-xs text-zinc-500 py-2 text-center">
+                            Aucun aliment enregistré pour le moment. Scanne ou crée d&apos;abord des aliments.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Ingrédients ajoutés */}
+                    {recipeDraftItems.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t border-white/[0.06]">
+                        <p className="text-xs font-medium text-zinc-300">
+                          Ingrédients ({recipeDraftItems.length})
+                        </p>
+                        <div className="space-y-2">
+                          {recipeDraftItems.map((ing, idx) => (
+                            <div
+                              key={`${ing.foodName}-${idx}`}
+                              className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#0f131d] border border-white/[0.05] text-xs"
+                            >
+                              <span className="truncate flex-1 text-zinc-200">{ing.foodName}</span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <NumberInput
+                                  min={1}
+                                  value={ing.quantityG}
+                                  onValueChange={(qty) =>
+                                    setRecipeDraftItems((prev) =>
+                                      prev.map((item, i) =>
+                                        i === idx ? { ...item, quantityG: qty } : item
+                                      )
+                                    )
+                                  }
+                                  className="w-16 rounded-lg bg-[#181d2a] border border-white/10 px-2 py-1 text-right font-mono text-zinc-100"
+                                />
+                                <span className="text-zinc-500">g</span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setRecipeDraftItems((prev) => prev.filter((_, i) => i !== idx))
+                                  }
+                                  className="p-1 text-zinc-500 hover:text-rose-400"
+                                >
+                                  <TrashIcon />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {(() => {
+                          const { perServing } = computeRecipeTotals(
+                            recipeDraftItems,
+                            recipeServings
+                          );
+                          return (
+                            <div className="rounded-xl bg-[#0f131d] p-3 text-xs flex items-center justify-between">
+                              <span className="text-zinc-400">Par portion :</span>
+                              <span className="font-mono text-blue-400 font-semibold">
+                                {perServing.kcal} kcal · P {perServing.proteinG}g · G{" "}
+                                {perServing.carbsG}g · L {perServing.fatG}g
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={!recipeName.trim() || recipeDraftItems.length === 0}
+                      className="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 disabled:opacity-40 text-white font-semibold text-sm transition"
+                    >
+                      Enregistrer la recette
+                    </button>
+                  </form>
+                ) : selectedRecipe ? (
+                  <div className="rounded-2xl bg-[#181d2a] border border-white/10 p-4 space-y-4">
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRecipe(null)}
+                        className="text-xs text-blue-400 hover:underline mb-1.5 inline-flex items-center gap-1"
+                      >
+                        ← Retour aux recettes
+                      </button>
+                      <h3 className="text-base font-semibold text-zinc-100">
+                        {selectedRecipe.name}
+                      </h3>
+                      <p className="text-xs text-zinc-400">
+                        Ajuste les quantités réellement utilisées pour ce repas
+                      </p>
+                    </div>
+
+                    {/* Portions à consigner */}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-zinc-400">Portions :</label>
+                        <NumberInput
+                          min={0.25}
+                          step="0.25"
+                          fallback={1}
+                          value={recipePortionsToLog}
+                          onValueChange={setRecipePortionsToLog}
+                          className="w-20 rounded-xl bg-[#0f131d] border border-white/10 px-2.5 py-1.5 text-sm font-mono text-zinc-100"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {[0.5, 1, 1.5, 2].map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setRecipePortionsToLog(p)}
+                            className={`px-2.5 py-1 rounded-full text-xs font-medium transition ${
+                              recipePortionsToLog === p
+                                ? "bg-blue-500 text-white"
+                                : "bg-white/5 text-zinc-300 hover:bg-white/10"
+                            }`}
+                          >
+                            {p}x
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Ingrédients ajustables */}
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
+                        Ingrédients (pour {selectedRecipe.servings} portion
+                        {selectedRecipe.servings > 1 ? "s" : ""})
+                      </p>
+                      {adjustedRecipeItems.map((ing, idx) => (
+                        <div
+                          key={`${ing.foodName}-${idx}`}
+                          className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#0f131d] border border-white/[0.05] text-xs"
+                        >
+                          <span className="truncate text-zinc-200">{ing.foodName}</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <NumberInput
+                              min={0}
+                              value={ing.quantityG}
+                              onValueChange={(qty) =>
+                                setAdjustedRecipeItems((prev) =>
+                                  prev.map((item, i) =>
+                                    i === idx ? { ...item, quantityG: qty } : item
+                                  )
+                                )
+                              }
+                              className="w-20 rounded-lg bg-[#181d2a] border border-white/10 px-2 py-1 text-right font-mono text-zinc-100"
+                            />
+                            <span className="text-zinc-500">g</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {(() => {
+                      const { perServing } = computeRecipeTotals(
+                        adjustedRecipeItems,
+                        selectedRecipe.servings
+                      );
+                      const mult = Math.max(0.25, recipePortionsToLog);
+                      return (
+                        <div className="grid grid-cols-4 gap-2 text-center text-xs bg-[#0f131d] p-3 rounded-xl border border-white/[0.06]">
+                          <div>
+                            <div className="text-zinc-400">Calories</div>
+                            <div className="font-semibold text-blue-400 text-sm mt-0.5">
+                              {Math.round(perServing.kcal * mult)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-zinc-400">Protéines</div>
+                            <div className="font-semibold text-amber-400 text-sm mt-0.5">
+                              {Math.round(perServing.proteinG * mult * 10) / 10} g
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-zinc-400">Glucides</div>
+                            <div className="font-semibold text-teal-400 text-sm mt-0.5">
+                              {Math.round(perServing.carbsG * mult * 10) / 10} g
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-zinc-400">Lipides</div>
+                            <div className="font-semibold text-purple-400 text-sm mt-0.5">
+                              {Math.round(perServing.fatG * mult * 10) / 10} g
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <button
+                      type="button"
+                      onClick={handleConfirmAdjustedRecipe}
+                      className="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-semibold text-sm transition"
+                    >
+                      Ajouter au journal
+                    </button>
+                  </div>
+                ) : (
+                  (tab === "recipes" || filteredRecipes.length > 0) && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-zinc-100">Mes recettes</h3>
+                        {onSaveRecipe && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCreatingRecipe(true);
+                              setSelectedRecipe(null);
+                            }}
+                            className="text-xs text-blue-400 hover:underline font-medium"
+                          >
+                            + Créer une recette
+                          </button>
+                        )}
+                      </div>
+                      {filteredRecipes.length === 0 ? (
+                        <p className="text-xs text-zinc-500 py-4 text-center">
+                          Aucune recette enregistrée. Clique sur « + Créer une recette » pour en créer une.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {filteredRecipes.map((r) => (
+                            <div
+                              key={r.id}
+                              onClick={() => openRecipeDetails(r)}
+                              className="cursor-pointer flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#181d2a] hover:bg-[#1f2535] border border-white/[0.06] transition"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-zinc-100 truncate">{r.name}</p>
+                                <p className="text-xs text-zinc-400">
+                                  {r.perServing.kcal} cal, 1 portion (P {r.perServing.proteinG}g · G {r.perServing.carbsG}g · L {r.perServing.fatG}g)
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {onDeleteRecipe && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteRecipe(r.id);
+                                    }}
+                                    className="w-8 h-8 rounded-full bg-white/5 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 flex items-center justify-center transition"
+                                    title="Supprimer cette recette"
+                                  >
+                                    <TrashIcon />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddRecipe(r);
+                                  }}
+                                  className="w-9 h-9 rounded-full bg-[#242b3d] hover:bg-blue-500 text-blue-400 hover:text-white flex items-center justify-center transition"
+                                  title="Consigner 1 portion"
+                                >
+                                  <PlusIcon className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                )}
               </div>
             )}
 

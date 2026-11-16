@@ -21,6 +21,7 @@ import {
   FoodLogEntry,
   MICRONUTRIENT_CATALOG,
   MealSlot,
+  Recipe,
   StepEntry,
 } from "@/lib/types";
 import { AnalyticsView } from "./AnalyticsView";
@@ -237,6 +238,26 @@ export function MacroPulseApp() {
       if (exists) return prev;
       return { ...prev, foods: [food, ...prev.foods] };
     });
+  }
+
+  function handleSaveRecipe(recipe: Recipe) {
+    setState((prev) => {
+      const exists = prev.recipes.some((r) => r.id === recipe.id);
+      if (exists) {
+        return {
+          ...prev,
+          recipes: prev.recipes.map((r) => (r.id === recipe.id ? recipe : r)),
+        };
+      }
+      return { ...prev, recipes: [recipe, ...prev.recipes] };
+    });
+  }
+
+  function handleDeleteRecipe(id: string) {
+    setState((prev) => ({
+      ...prev,
+      recipes: prev.recipes.filter((r) => r.id !== id),
+    }));
   }
 
   function handleDuplicateYesterday(slotFilter?: MealSlot) {
@@ -1151,6 +1172,8 @@ export function MacroPulseApp() {
         initialMealSlot={quickAddSlot}
         onAddFoodLogs={handleAddFoodLogs}
         onSaveCustomFood={handleSaveCustomFood}
+        onSaveRecipe={handleSaveRecipe}
+        onDeleteRecipe={handleDeleteRecipe}
       />
 
       <ProfileMenuModal
