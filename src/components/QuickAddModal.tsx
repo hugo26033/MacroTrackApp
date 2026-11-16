@@ -55,6 +55,9 @@ export function QuickAddModal({
   const [tab, setTab] = useState<QuickAddTabMode>(initialTab);
   const [mealSlot, setMealSlot] = useState<MealSlot>(initialMealSlot);
   const [searchQuery, setSearchQuery] = useState("");
+  const [offResults, setOffResults] = useState<FoodItem[]>([]);
+  const [offLoading, setOffLoading] = useState(false);
+  const [offError, setOffError] = useState<string | null>(null);
 
   // Barcode state
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -84,6 +87,45 @@ export function QuickAddModal({
   const [manualC, setManualC] = useState(20);
   const [manualF, setManualF] = useState(6);
   const [manualFiber, setManualFiber] = useState(2);
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2 || (tab !== "all" && tab !== "foods")) {
+      setOffResults([]);
+      setOffError(null);
+      setOffLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setOffLoading(true);
+      setOffError(null);
+      try {
+        const res = await fetch(`/api/foods/search?q=${encodeURIComponent(q)}`, {
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setOffError(data.error || "Erreur Open Food Facts.");
+          setOffResults([]);
+        } else {
+          setOffResults(Array.isArray(data.products) ? data.products : []);
+        }
+      } catch (err) {
+        if ((err as { name?: string }).name !== "AbortError") {
+          setOffError("Impossible de contacter Open Food Facts.");
+        }
+      } finally {
+        setOffLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [searchQuery, tab]);
 
   useEffect(() => {
     if (open) {
@@ -674,6 +716,57 @@ export function QuickAddModal({
                         </div>
                       );
                     })}
+                  </div>
+                )}
+
+                {normalizedQuery.length >= 2 && (
+                  <div className="pt-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                        Base Open Food Facts
+                      </h4>
+                      {offLoading && (
+                        <span className="text-xs text-blue-400">Recherche...</span>
+                      )}
+                    </div>
+                    {offError && (
+                      <p className="text-xs text-amber-400">{offError}</p>
+                    )}
+                    {!offLoading && !offError && offResults.length === 0 && (
+                      <p className="text-xs text-zinc-500 py-2">
+                        Aucun produit trouvé sur Open Food Facts pour « {searchQuery.trim()} ».
+                      </p>
+                    )}
+                    <div className="space-y-2">
+                      {offResults.map((f) => {
+                        const scaled = scaleNutrients(f.per100g, f.servingSizeG);
+                        return (
+                          <div
+                            key={f.id}
+                            className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#181d2a] border border-white/[0.06]"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-zinc-100 truncate">{f.name}</p>
+                              <p className="text-xs text-zinc-400 truncate">
+                                {scaled.kcal} cal, {f.servingLabel}
+                                {f.brand ? `, ${f.brand}` : ""}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSaveCustomFood(f);
+                                handleAddSavedFood(f);
+                              }}
+                              className="shrink-0 w-9 h-9 rounded-full bg-[#242b3d] hover:bg-blue-500 text-blue-400 hover:text-white flex items-center justify-center transition"
+                              title="Enregistrer et consigner"
+                            >
+                              <PlusIcon className="w-4 h-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
