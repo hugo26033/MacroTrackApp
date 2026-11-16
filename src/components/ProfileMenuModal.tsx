@@ -5,7 +5,6 @@ import type { WeightEntry } from "@/lib/types";
 import {
   ChartIcon,
   ChevronRightIcon,
-  ClockIcon,
   FootprintsIcon,
   MoonIcon,
   ScaleIcon,
@@ -21,10 +20,9 @@ interface ProfileMenuModalProps {
   displayName: string;
   streakCount: number;
   weights: WeightEntry[];
-  fastingSummary: string;
   isDark: boolean;
   onToggleTheme: () => void;
-  onNavigate: (tab: "fasting" | "goals" | "analytics") => void;
+  onNavigate: (tab: "goals" | "analytics") => void;
   onOpenFoods: () => void;
   onExportJSON: () => void;
   onExportCSV: () => void;
@@ -37,7 +35,6 @@ export function ProfileMenuModal({
   displayName,
   streakCount,
   weights,
-  fastingSummary,
   isDark,
   onToggleTheme,
   onNavigate,
@@ -125,33 +122,6 @@ export function ProfileMenuModal({
             <ChevronRightIcon className="w-4 h-4 text-zinc-500" />
           </div>
         </button>
-
-        {/* Groupe 1 : Jeûne intermittent */}
-        <div
-          className={`rounded-2xl border divide-y ${
-            isDark
-              ? "bg-[#181c28] border-white/[0.06] divide-white/[0.06]"
-              : "bg-white border-zinc-200 divide-zinc-100"
-          }`}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              onNavigate("fasting");
-              onClose();
-            }}
-            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02]"
-          >
-            <div className="flex items-center gap-3">
-              <ClockIcon className="w-5 h-5 text-zinc-400" />
-              <span className="text-sm font-medium">Jeûne intermittent</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-zinc-400">
-              <span className="font-mono">{fastingSummary}</span>
-              <ChevronRightIcon className="w-4 h-4 text-zinc-500" />
-            </div>
-          </button>
-        </div>
 
         {/* Groupe 2 : Objectifs, Poids, Aliments */}
         <div

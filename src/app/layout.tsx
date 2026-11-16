@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MacroPulse — Kcal, Poids, Pas & Jeûne",
+  title: "MacroPulse — Kcal, Macros, Poids & Pas",
   description:
-    "PWA de suivi nutritionnel précis, tendances de poids 3j/5j, calculateur TDEE adaptatif, jeûne intermittent automatique et ajout IA Gemini.",
+    "PWA de suivi nutritionnel précis, tendances de poids 3j/5j, calculateur TDEE adaptatif et ajout IA Gemini.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

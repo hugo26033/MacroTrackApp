@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   analyzeWeightTrends,
-  computeAutomaticFasting,
   sumNutrients,
   todayISO,
 } from "@/lib/calculations";
@@ -25,7 +24,6 @@ import {
   StepEntry,
 } from "@/lib/types";
 import { AnalyticsView } from "./AnalyticsView";
-import { FastingView } from "./FastingView";
 import { GoalsTdeeView } from "./GoalsTdeeView";
 import {
   BarcodeIcon,
@@ -33,7 +31,6 @@ import {
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  ClockIcon,
   CopyIcon,
   DropletIcon,
   FlameIcon,
@@ -55,7 +52,7 @@ import { QuickAddModal, QuickAddTabMode } from "./QuickAddModal";
 import { ProfileMenuModal } from "./ProfileMenuModal";
 import { FoodLogDetailModal } from "./FoodLogDetailModal";
 
-type ActiveTab = "today" | "analytics" | "fasting" | "goals";
+type ActiveTab = "today" | "analytics" | "goals";
 
 const MEAL_LABELS: { slot: MealSlot; label: string }[] = [
   { slot: "breakfast", label: "Petit déjeuner" },
@@ -162,11 +159,6 @@ export function MacroPulseApp() {
   const weightTrends = useMemo(
     () => analyzeWeightTrends(state.weights, state.profile.weightTrendThresholdKgWeek),
     [state.weights, state.profile.weightTrendThresholdKgWeek]
-  );
-
-  const fastingStatus = useMemo(
-    () => computeAutomaticFasting(state.foodLogs, state.profile.fastingTargetHours),
-    [state.foodLogs, state.profile.fastingTargetHours]
   );
 
   const loggedDatesSet = useMemo(
@@ -387,9 +379,7 @@ export function MacroPulseApp() {
             <h1 className="text-2xl font-bold tracking-tight">
               {activeTab === "analytics"
                 ? "Progression"
-                : activeTab === "fasting"
-                  ? "Jeûne"
-                  : "Profil & Objectifs"}
+                : "Profil & Objectifs"}
             </h1>
           )}
 
@@ -857,23 +847,6 @@ export function MacroPulseApp() {
                   </div>
                 </div>
 
-                {/* Jeûne */}
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("fasting")}
-                  className="w-full p-4 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02] transition"
-                >
-                  <div>
-                    <p className="text-sm font-semibold">Jeûne intermittent</p>
-                    <p className="text-xs text-zinc-400 mt-0.5">
-                      {fastingStatus.currentFastHours.toFixed(1)}h / {state.profile.fastingTargetHours}h
-                      {" · "}
-                      {fastingStatus.isCurrentlyFasting ? "En cours" : "Fenêtre active"}
-                    </p>
-                  </div>
-                  <ChevronRightIcon className="w-4 h-4 text-zinc-400 shrink-0" />
-                </button>
-
                 {/* Pas */}
                 <div className="p-4 flex items-center justify-between gap-3">
                   <button
@@ -956,19 +929,6 @@ export function MacroPulseApp() {
             onLogWeight={handleLogWeight}
             onLogSteps={handleLogSteps}
             onImportSteps={handleImportSteps}
-          />
-        )}
-
-        {activeTab === "fasting" && (
-          <FastingView
-            foodLogs={state.foodLogs}
-            fastingTargetHours={state.profile.fastingTargetHours}
-            onChangeTargetHours={(h) =>
-              setState((prev) => ({
-                ...prev,
-                profile: { ...prev.profile, fastingTargetHours: h },
-              }))
-            }
           />
         )}
 
@@ -1146,17 +1106,6 @@ export function MacroPulseApp() {
                 <ScaleIcon className="w-4 h-4 text-emerald-400" />
                 <span>Poids & Pas</span>
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAddSheetOpen(false);
-                  setActiveTab("fasting");
-                }}
-                className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-100 hover:bg-white/[0.04] transition"
-              >
-                <ClockIcon className="w-4 h-4 text-amber-400" />
-                <span>Jeûne intermittent</span>
-              </button>
             </div>
           </div>
         </div>
@@ -1183,7 +1132,6 @@ export function MacroPulseApp() {
         displayName={state.profile.displayName}
         streakCount={streakCount}
         weights={state.weights}
-        fastingSummary={`${fastingStatus.currentFastHours.toFixed(1)}h / ${state.profile.fastingTargetHours}h`}
         isDark={isDark}
         onToggleTheme={() =>
           setState((prev) => ({
