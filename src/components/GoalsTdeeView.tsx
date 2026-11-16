@@ -22,6 +22,7 @@ interface GoalsTdeeViewProps {
   onExportJSON: () => void;
   onExportCSV: () => void;
   onResetDemo: () => void;
+  onClearAllData: () => void;
 }
 
 const ACTIVITY_LABELS: { value: ActivityLevel; label: string }[] = [
@@ -42,6 +43,7 @@ export function GoalsTdeeView({
   onExportJSON,
   onExportCSV,
   onResetDemo,
+  onClearAllData,
 }: GoalsTdeeViewProps) {
   const latestWeight = weights.length > 0 ? weights[weights.length - 1].weightKg : 75;
   const tdee = calculateTdee({
@@ -354,10 +356,21 @@ export function GoalsTdeeView({
           </button>
           <button
             type="button"
-            onClick={onResetDemo}
-            className="px-3.5 py-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-medium hover:bg-rose-500/25"
+            onClick={() => {
+              if (window.confirm("Effacer tous les repas, pesées, pas et données de test pour repartir à zéro ?")) {
+                onClearAllData();
+              }
+            }}
+            className="px-3.5 py-2 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-semibold hover:bg-rose-500/30"
           >
-            Réinitialiser démo
+            Effacer toutes les données
+          </button>
+          <button
+            type="button"
+            onClick={onResetDemo}
+            className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium"
+          >
+            Charger démo
           </button>
         </div>
       </section>

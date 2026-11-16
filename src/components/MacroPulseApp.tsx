@@ -881,6 +881,17 @@ export function MacroPulseApp() {
               )
             }
             onResetDemo={() => setState(createInitialDemoState())}
+            onClearAllData={() =>
+              setState((prev) => ({
+                ...prev,
+                foods: [],
+                recipes: [],
+                foodLogs: [],
+                weights: [],
+                steps: [],
+                waterLogs: [],
+              }))
+            }
           />
         )}
       </main>
