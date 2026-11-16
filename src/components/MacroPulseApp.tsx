@@ -27,36 +27,87 @@ import { AnalyticsView } from "./AnalyticsView";
 import { FastingView } from "./FastingView";
 import { GoalsTdeeView } from "./GoalsTdeeView";
 import {
+  BarcodeIcon,
   ChartIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
   ClockIcon,
   CopyIcon,
   DropletIcon,
+  FlameIcon,
   FootprintsIcon,
   HomeIcon,
   MoonIcon,
+  PencilIcon,
   PlusIcon,
   ScaleIcon,
-  SettingsIcon,
+  SearchIcon,
+  SparklesIcon,
   SunIcon,
+  SwapIcon,
   TrashIcon,
+  UserIcon,
+  XIcon,
 } from "./Icons";
-import { QuickAddModal } from "./QuickAddModal";
+import { QuickAddModal, QuickAddTabMode } from "./QuickAddModal";
 
 type ActiveTab = "today" | "analytics" | "fasting" | "goals";
 
 const MEAL_LABELS: { slot: MealSlot; label: string }[] = [
-  { slot: "breakfast", label: "Petit-déjeuner" },
+  { slot: "breakfast", label: "Petit déjeuner" },
   { slot: "lunch", label: "Déjeuner" },
   { slot: "dinner", label: "Dîner" },
-  { slot: "snack", label: "Collation" },
+  { slot: "snack", label: "Snacks" },
 ];
+
+const WEEKDAY_LETTERS = ["L", "M", "M", "J", "V", "S", "D"];
+
+function formatDateHeader(iso: string): string {
+  if (!iso) return "Aujourd'hui";
+  const today = todayISO();
+  if (iso === today) return "Aujourd'hui";
+  const d = new Date(`${iso}T12:00:00`);
+  const t = new Date(`${today}T12:00:00`);
+  const diffDays = Math.round((d.getTime() - t.getTime()) / 86400000);
+  if (diffDays === -1) return "Hier";
+  if (diffDays === 1) return "Demain";
+  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+}
+
+function getWeekDaysISO(centerISO: string): string[] {
+  const base = centerISO ? new Date(`${centerISO}T12:00:00`) : new Date();
+  const day = base.getDay(); // 0=Sun..6=Sat
+  const diffToMon = day === 0 ? -6 : 1 - day;
+  const monday = new Date(base);
+  monday.setDate(base.getDate() + diffToMon);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+}
 
 export function MacroPulseApp() {
   const [state, setState] = useState<AppState>(EMPTY_APP_STATE);
   const [hydrated, setHydrated] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("today");
   const [selectedDate, setSelectedDate] = useState<string>("");
+
+  // Modals & UI toggles
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [showMicronutrients, setShowMicronutrients] = useState(false);
+  const [showFullJournal, setShowFullJournal] = useState(false);
+  const [expandedMeals, setExpandedMeals] = useState<Record<MealSlot, boolean>>({
+    breakfast: false,
+    lunch: false,
+    dinner: false,
+    snack: false,
+  });
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddTab, setQuickAddTab] = useState<QuickAddTabMode>("all");
+  const [quickAddSlot, setQuickAddSlot] = useState<MealSlot>("lunch");
 
   useEffect(() => {
     setState(loadAppState());
@@ -109,8 +160,37 @@ export function MacroPulseApp() {
     [state.foodLogs, state.profile.fastingTargetHours]
   );
 
+  const loggedDatesSet = useMemo(
+    () => new Set(state.foodLogs.map((l) => l.logDate)),
+    [state.foodLogs]
+  );
+
+  const weekDays = useMemo(() => getWeekDaysISO(selectedDate), [selectedDate]);
+
+  const streakCount = useMemo(() => {
+    const today = todayISO();
+    let count = 0;
+    const cursor = new Date(`${today}T12:00:00`);
+    // If today isn't logged yet, allow streak up to yesterday
+    if (!loggedDatesSet.has(today)) {
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    while (loggedDatesSet.has(cursor.toISOString().slice(0, 10))) {
+      count += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return count;
+  }, [loggedDatesSet]);
+
+  function openQuickAdd(tab: QuickAddTabMode = "all", slot: MealSlot = "lunch") {
+    setAddSheetOpen(false);
+    setQuickAddTab(tab);
+    setQuickAddSlot(slot);
+    setQuickAddOpen(true);
+  }
+
   function shiftDate(deltaDays: number) {
-    const d = new Date(selectedDate);
+    const d = new Date(`${selectedDate || todayISO()}T12:00:00`);
     d.setDate(d.getDate() + deltaDays);
     setSelectedDate(d.toISOString().slice(0, 10));
   }
@@ -143,11 +223,13 @@ export function MacroPulseApp() {
     });
   }
 
-  function handleDuplicateYesterday() {
-    const d = new Date(selectedDate);
+  function handleDuplicateYesterday(slotFilter?: MealSlot) {
+    const d = new Date(`${selectedDate || todayISO()}T12:00:00`);
     d.setDate(d.getDate() - 1);
     const yesterday = d.toISOString().slice(0, 10);
-    const yesterdayLogs = state.foodLogs.filter((l) => l.logDate === yesterday);
+    const yesterdayLogs = state.foodLogs.filter(
+      (l) => l.logDate === yesterday && (!slotFilter || l.mealSlot === slotFilter)
+    );
     if (yesterdayLogs.length === 0) return;
 
     const duplicated: FoodLogEntry[] = yesterdayLogs.map((l, idx) => ({
@@ -214,6 +296,16 @@ export function MacroPulseApp() {
     }));
   }
 
+  function handleUpdateNote(text: string) {
+    setState((prev) => ({
+      ...prev,
+      dailyNotes: {
+        ...(prev.dailyNotes ?? {}),
+        [selectedDate]: text,
+      },
+    }));
+  }
+
   function downloadFile(filename: string, content: string, mime: string) {
     const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
@@ -226,31 +318,43 @@ export function MacroPulseApp() {
 
   const kcalPct = Math.min(100, Math.round((dayTotals.kcal / Math.max(1, state.goals.targetKcal)) * 100));
   const kcalRemaining = state.goals.targetKcal - dayTotals.kcal;
+  const dailyNote = state.dailyNotes?.[selectedDate] ?? "";
+
+  const cardSurface = isDark
+    ? "bg-[#181d2a] border-white/[0.06]"
+    : "bg-white border-zinc-200 shadow-sm";
 
   return (
     <div
-      className={`min-h-screen pb-24 transition-colors ${
-        isDark ? "bg-zinc-950 text-zinc-100" : "bg-zinc-50 text-zinc-900"
+      className={`min-h-screen pb-28 transition-colors ${
+        isDark ? "bg-[#0f131d] text-zinc-100" : "bg-zinc-100 text-zinc-900"
       }`}
     >
-      {/* Header */}
+      {/* Top Bar */}
       <header
-        className={`sticky top-0 z-30 backdrop-blur-md border-b ${
-          isDark ? "bg-zinc-950/85 border-zinc-900" : "bg-white/85 border-zinc-200"
+        className={`sticky top-0 z-30 backdrop-blur-md ${
+          isDark ? "bg-[#0f131d]/90" : "bg-zinc-100/90"
         }`}
       >
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-sm">
-              M
-            </div>
-            <div>
-              <h1 className="font-semibold text-sm sm:text-base leading-tight">MacroPulse</h1>
-              <p className="text-[11px] text-zinc-400">
-                Jeûne auto : {fastingStatus.currentFastHours.toFixed(1)}h / {state.profile.fastingTargetHours}h
-              </p>
-            </div>
-          </div>
+        <div className="max-w-xl mx-auto px-4 pt-3 pb-2 flex items-center justify-between gap-3">
+          {activeTab === "today" ? (
+            <button
+              type="button"
+              onClick={() => setDatePickerOpen((v) => !v)}
+              className="inline-flex items-center gap-1.5 text-2xl font-bold tracking-tight"
+            >
+              <span>{formatDateHeader(selectedDate)}</span>
+              <ChevronDownIcon className="w-5 h-5 text-zinc-400 mt-0.5" />
+            </button>
+          ) : (
+            <h1 className="text-2xl font-bold tracking-tight">
+              {activeTab === "analytics"
+                ? "Progression"
+                : activeTab === "fasting"
+                  ? "Jeûne"
+                  : "Profil & Objectifs"}
+            </h1>
+          )}
 
           <div className="flex items-center gap-2">
             <button
@@ -261,148 +365,206 @@ export function MacroPulseApp() {
                   profile: { ...prev.profile, theme: isDark ? "light" : "dark" },
                 }))
               }
-              className={`p-2 rounded-xl border ${
+              className={`w-9 h-9 rounded-full border flex items-center justify-center transition ${
                 isDark
-                  ? "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800"
-                  : "bg-zinc-100 border-zinc-200 text-zinc-700 hover:bg-zinc-200"
+                  ? "bg-[#181d2a] border-white/10 text-zinc-300 hover:bg-[#22283a]"
+                  : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50"
               }`}
               title="Changer de thème"
             >
               {isDark ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab(activeTab === "goals" ? "today" : "goals")}
+              className={`w-9 h-9 rounded-full border flex items-center justify-center transition ${
+                activeTab === "goals"
+                  ? "bg-blue-500 border-blue-400 text-white"
+                  : isDark
+                    ? "bg-[#181d2a] border-white/10 text-zinc-200 hover:bg-[#22283a]"
+                    : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+              }`}
+              title="Profil & Objectifs"
+            >
+              <UserIcon className="w-4 h-4" />
+            </button>
           </div>
         </div>
-      </header>
 
-      {/* Main content */}
-      <main className="max-w-3xl mx-auto px-4 pt-5 space-y-5">
-        {activeTab === "today" && (
-          <>
-            {/* Sélecteur de date */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="inline-flex items-center gap-1 rounded-2xl bg-zinc-900/80 border border-zinc-800 p-1 text-xs">
-                <button
-                  type="button"
-                  onClick={() => shiftDate(-1)}
-                  className="px-2.5 py-1.5 rounded-xl hover:bg-zinc-800 text-zinc-300"
-                >
-                  ←
-                </button>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-transparent px-2 py-1 font-mono text-zinc-100 focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => shiftDate(1)}
-                  className="px-2.5 py-1.5 rounded-xl hover:bg-zinc-800 text-zinc-300"
-                >
-                  →
-                </button>
-              </div>
-
+        {/* Date Picker Drawer */}
+        {activeTab === "today" && datePickerOpen && (
+          <div className="max-w-xl mx-auto px-4 pb-3">
+            <div className={`rounded-2xl border p-2.5 flex items-center justify-between gap-2 ${cardSurface}`}>
               <button
                 type="button"
-                onClick={handleDuplicateYesterday}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-xs text-zinc-300"
+                onClick={() => shiftDate(-1)}
+                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium"
               >
-                <CopyIcon className="w-3.5 h-3.5 text-emerald-400" />
-                Dupliquer hier
+                ← Préc.
+              </button>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  setDatePickerOpen(false);
+                }}
+                className="bg-transparent text-xs font-mono focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDate(todayISO());
+                  setDatePickerOpen(false);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-blue-500/15 text-blue-400 text-xs font-medium"
+              >
+                Aujourd&apos;hui
+              </button>
+              <button
+                type="button"
+                onClick={() => shiftDate(1)}
+                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium"
+              >
+                Suiv. →
               </button>
             </div>
+          </div>
+        )}
+      </header>
 
-            {/* Carte Kcal & Macros */}
-            <section className="rounded-3xl bg-zinc-900/80 border border-zinc-800 p-5 space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs text-zinc-400 uppercase tracking-wider">Calories du jour</p>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-3xl font-bold font-mono text-emerald-400">
-                      {dayTotals.kcal}
-                    </span>
-                    <span className="text-sm text-zinc-400 font-mono">
-                      / {state.goals.targetKcal} kcal
-                    </span>
-                  </div>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    {kcalRemaining >= 0
-                      ? `Reste ${kcalRemaining} kcal`
-                      : `Dépassement de ${Math.abs(kcalRemaining)} kcal`}
-                  </p>
-                </div>
-
-                {/* Anneau progression */}
-                <div className="relative w-16 h-16 flex items-center justify-center">
-                  <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
-                    <circle
-                      cx="32"
-                      cy="32"
-                      r="26"
-                      fill="none"
-                      stroke="currentColor"
-                      className="text-zinc-800"
-                      strokeWidth="6"
-                    />
-                    <circle
-                      cx="32"
-                      cy="32"
-                      r="26"
-                      fill="none"
-                      stroke="#10b981"
-                      strokeWidth="6"
-                      strokeLinecap="round"
-                      strokeDasharray={`${(kcalPct / 100) * 163.3} 163.3`}
-                    />
-                  </svg>
-                  <span className="absolute text-xs font-mono font-semibold">{kcalPct}%</span>
-                </div>
-              </div>
-
-              {/* Macros */}
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  {
-                    label: "Protéines",
-                    val: dayTotals.proteinG,
-                    target: state.goals.proteinG,
-                    bar: "bg-emerald-500",
-                  },
-                  {
-                    label: "Glucides",
-                    val: dayTotals.carbsG,
-                    target: state.goals.carbsG,
-                    bar: "bg-sky-500",
-                  },
-                  {
-                    label: "Lipides",
-                    val: dayTotals.fatG,
-                    target: state.goals.fatG,
-                    bar: "bg-amber-500",
-                  },
-                ].map((m) => {
-                  const pct = Math.min(100, Math.round((m.val / Math.max(1, m.target)) * 100));
+      {/* Main Content */}
+      <main className="max-w-xl mx-auto px-4 pt-2 space-y-5">
+        {activeTab === "today" && (
+          <>
+            {/* Weekly Streak Strip */}
+            <section className="flex items-center justify-between gap-2 py-1">
+              <div className="flex-1 grid grid-cols-7 gap-1 text-center">
+                {weekDays.map((dayISO, idx) => {
+                  const hasLogs = loggedDatesSet.has(dayISO);
+                  const isSelected = dayISO === selectedDate;
                   return (
-                    <div key={m.label} className="space-y-1.5">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-zinc-400">{m.label}</span>
-                        <span className="font-mono">
-                          {m.val}/{m.target}g
-                        </span>
-                      </div>
-                      <div className="h-2 rounded-full bg-zinc-950 overflow-hidden">
-                        <div className={`h-full ${m.bar}`} style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
+                    <button
+                      key={dayISO}
+                      type="button"
+                      onClick={() => setSelectedDate(dayISO)}
+                      className="flex flex-col items-center gap-1.5 group"
+                    >
+                      <span
+                        className={`text-[11px] font-medium ${
+                          isSelected ? "text-white font-bold" : "text-zinc-400"
+                        }`}
+                      >
+                        {WEEKDAY_LETTERS[idx]}
+                      </span>
+                      <span
+                        className={`w-6 h-6 rounded-full flex items-center justify-center transition ${
+                          hasLogs
+                            ? isSelected
+                              ? "bg-blue-500 text-white ring-2 ring-blue-400/50"
+                              : "bg-zinc-200 text-[#0f131d]"
+                            : isSelected
+                              ? "border-2 border-blue-400 bg-blue-500/15"
+                              : "border border-zinc-600/70 group-hover:border-zinc-400"
+                        }`}
+                      >
+                        {hasLogs && <CheckIcon className="w-3.5 h-3.5" />}
+                      </span>
+                    </button>
                   );
                 })}
               </div>
 
-              {/* Micronutriments épinglés */}
-              {state.profile.pinnedMicronutrients.length > 0 && (
-                <div className="pt-3 border-t border-zinc-800/80">
-                  <p className="text-[11px] text-zinc-400 mb-2">Nutriments & micronutriments épinglés</p>
+              <div className="pl-3 border-l border-white/10 flex items-center justify-center">
+                <div className="relative flex items-center justify-center w-10 h-10 text-amber-300">
+                  <FlameIcon className="w-9 h-9" />
+                  <span className="absolute mt-1.5 text-[11px] font-bold text-[#0f131d]">
+                    {streakCount}
+                  </span>
+                </div>
+              </div>
+            </section>
+
+            {/* Calories Card */}
+            <section className={`rounded-2xl border p-4 space-y-3 ${cardSurface}`}>
+              <p className="text-sm font-medium text-zinc-300">Calories</p>
+              <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-2xl font-bold tracking-tight">
+                    {dayTotals.kcal.toLocaleString("fr-FR")} cal
+                  </span>
+                  <span className="text-sm text-zinc-400">
+                    / {state.goals.targetKcal.toLocaleString("fr-FR")}
+                  </span>
+                  <span className="text-sm" aria-hidden="true">🔥</span>
+                </div>
+                <span className={`text-sm font-semibold ${kcalRemaining < 0 ? "text-rose-400" : "text-zinc-200"}`}>
+                  {kcalRemaining >= 0
+                    ? `${kcalRemaining.toLocaleString("fr-FR")} restants`
+                    : `${Math.abs(kcalRemaining).toLocaleString("fr-FR")} dépassés`}
+                </span>
+              </div>
+              <div className="h-2.5 rounded-full bg-[#242a3a] overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    kcalRemaining < 0 ? "bg-rose-500" : "bg-blue-500"
+                  }`}
+                  style={{ width: `${kcalPct}%` }}
+                />
+              </div>
+            </section>
+
+            {/* Macros / Micronutrients Card */}
+            <section className={`rounded-2xl border p-4 relative ${cardSurface}`}>
+              <button
+                type="button"
+                onClick={() => setShowMicronutrients((v) => !v)}
+                className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-300 transition"
+                title={showMicronutrients ? "Voir les macros" : "Voir les micronutriments épinglés"}
+              >
+                <SwapIcon className="w-3.5 h-3.5" />
+              </button>
+
+              {!showMicronutrients ? (
+                <div className="grid grid-cols-3 gap-3 pr-6">
+                  {[
+                    {
+                      label: "Glucides",
+                      val: dayTotals.carbsG,
+                      target: state.goals.carbsG,
+                      bar: "bg-teal-400",
+                    },
+                    {
+                      label: "Lipides",
+                      val: dayTotals.fatG,
+                      target: state.goals.fatG,
+                      bar: "bg-purple-400",
+                    },
+                    {
+                      label: "Protéines",
+                      val: dayTotals.proteinG,
+                      target: state.goals.proteinG,
+                      bar: "bg-amber-400",
+                    },
+                  ].map((m) => {
+                    const pct = Math.min(100, Math.round((m.val / Math.max(1, m.target)) * 100));
+                    return (
+                      <div key={m.label} className="space-y-1.5">
+                        <p className="text-xs text-zinc-400">{m.label}</p>
+                        <p className="text-base font-bold leading-tight">
+                          {Math.round(m.val)} g{" "}
+                          <span className="text-xs font-normal text-zinc-400">/ {m.target}</span>
+                        </p>
+                        <div className="h-2 rounded-full bg-[#242a3a] overflow-hidden">
+                          <div className={`h-full rounded-full ${m.bar}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="space-y-2 pr-6">
+                  <p className="text-xs font-medium text-zinc-400">Micronutriments épinglés</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {state.profile.pinnedMicronutrients.map((key) => {
                       const meta = MICRONUTRIENT_CATALOG.find((c) => c.key === key);
@@ -412,7 +574,7 @@ export function MacroPulseApp() {
                       return (
                         <div
                           key={key}
-                          className="rounded-xl bg-zinc-950 border border-zinc-800/80 px-2.5 py-2 text-xs"
+                          className="rounded-xl bg-white/[0.04] px-2.5 py-2 text-xs"
                         >
                           <div className="text-zinc-400 truncate">{meta.label}</div>
                           <div className="font-mono font-semibold mt-0.5">
@@ -426,127 +588,239 @@ export function MacroPulseApp() {
               )}
             </section>
 
-            {/* Cartes rapides Poids / Pas / Hydratation */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Poids */}
-              <div
-                onClick={() => setActiveTab("analytics")}
-                className="cursor-pointer rounded-2xl bg-zinc-900/80 border border-zinc-800 hover:border-zinc-700 p-4 space-y-1"
-              >
-                <div className="flex items-center justify-between text-xs text-zinc-400">
-                  <span className="inline-flex items-center gap-1.5">
-                    <ScaleIcon className="w-4 h-4 text-emerald-400" /> Poids & Tendance
-                  </span>
-                  <span className="text-emerald-400 capitalize">{weightTrends.status3}</span>
-                </div>
-                <div className="text-xl font-bold font-mono">
-                  {weightTrends.latestWeight ? `${weightTrends.latestWeight} kg` : "—"}
-                </div>
-                <p className="text-[11px] text-zinc-500">
-                  3j: {weightTrends.ma3Latest ?? "—"} · 5j: {weightTrends.ma5Latest ?? "—"}
-                </p>
-              </div>
-
-              {/* Pas */}
-              <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4 space-y-2">
-                <div className="flex items-center justify-between text-xs text-zinc-400">
-                  <span className="inline-flex items-center gap-1.5">
-                    <FootprintsIcon className="w-4 h-4 text-sky-400" /> Pas
-                  </span>
-                  <span className="font-mono">
-                    {daySteps.toLocaleString("fr-FR")} / {state.goals.targetSteps.toLocaleString("fr-FR")}
-                  </span>
-                </div>
-                <div className="flex gap-1.5">
-                  {[1000, 2500].map((inc) => (
-                    <button
-                      key={inc}
-                      type="button"
-                      onClick={() => handleLogSteps(selectedDate, daySteps + inc)}
-                      className="flex-1 py-1 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-sky-500/50 text-[11px] font-mono text-sky-300"
-                    >
-                      +{inc}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Hydratation */}
-              <div className="rounded-2xl bg-zinc-900/80 border border-zinc-800 p-4 space-y-2">
-                <div className="flex items-center justify-between text-xs text-zinc-400">
-                  <span className="inline-flex items-center gap-1.5">
-                    <DropletIcon className="w-4 h-4 text-cyan-400" /> Hydratation
-                  </span>
-                  <span className="font-mono">
-                    {dayWaterMl} / {state.goals.targetWaterMl} ml
-                  </span>
-                </div>
-                <div className="flex gap-1.5">
-                  {[250, 500].map((ml) => (
-                    <button
-                      key={ml}
-                      type="button"
-                      onClick={() => handleAddWater(ml)}
-                      className="flex-1 py-1 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-cyan-500/50 text-[11px] font-mono text-cyan-300"
-                    >
-                      +{ml} ml
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Journal des repas */}
+            {/* Repas Section */}
             <section className="space-y-3">
-              {MEAL_LABELS.map(({ slot, label }) => {
-                const items = dayFoodLogs.filter((l) => l.mealSlot === slot);
-                const slotKcal = items.reduce((s, i) => s + i.nutrients.kcal, 0);
-                return (
-                  <div
-                    key={slot}
-                    className="rounded-2xl bg-zinc-900/70 border border-zinc-800 p-4 space-y-2.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold">{label}</h3>
-                      <span className="text-xs font-mono text-zinc-400">{slotKcal} kcal</span>
-                    </div>
-                    {items.length === 0 ? (
-                      <p className="text-xs text-zinc-500">Aucun aliment enregistré.</p>
-                    ) : (
-                      <div className="divide-y divide-zinc-800/70">
-                        {items.map((item) => (
-                          <div
-                            key={item.id}
-                            className="py-2 flex items-center justify-between gap-2 text-xs"
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold">Repas</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowFullJournal((v) => !v)}
+                  className="text-sm font-semibold text-blue-400 hover:text-blue-300"
+                >
+                  {showFullJournal ? "Vue résumée" : "Voir le journal"}
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {MEAL_LABELS.map(({ slot, label }) => {
+                  const items = dayFoodLogs.filter((l) => l.mealSlot === slot);
+                  const slotKcal = items.reduce((s, i) => s + i.nutrients.kcal, 0);
+                  const isExpanded = showFullJournal || expandedMeals[slot];
+
+                  return (
+                    <div key={slot} className={`rounded-2xl border p-4 space-y-2.5 ${cardSurface}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-base font-medium">{label}</h3>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedMeals((prev) => ({ ...prev, [slot]: !prev[slot] }))
+                            }
+                            className="px-2 py-1 text-zinc-400 hover:text-zinc-200 text-sm tracking-widest"
+                            title="Afficher / masquer le détail"
                           >
-                            <div>
-                              <p className="font-medium text-zinc-200">{item.foodName}</p>
-                              <p className="text-[11px] text-zinc-500">
-                                {item.quantityG} g · P {item.nutrients.proteinG}g · G{" "}
-                                {item.nutrients.carbsG}g · L {item.nutrients.fatG}g ·{" "}
-                                {item.loggedAt.slice(11, 16)}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-emerald-400 font-semibold">
-                                {item.nutrients.kcal}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteFoodLog(item.id)}
-                                className="text-zinc-500 hover:text-rose-400 p-1"
-                                title="Supprimer"
-                              >
-                                <TrashIcon />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                            •••
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openQuickAdd("all", slot)}
+                            className="px-3.5 py-1.5 rounded-full bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 text-xs font-semibold transition"
+                          >
+                            Consignez
+                          </button>
+                        </div>
                       </div>
-                    )}
+
+                      {items.length === 0 ? (
+                        <div className="flex items-center justify-between pt-1 border-t border-white/[0.05]">
+                          <p className="text-xs text-zinc-400">Aucun aliment consigné</p>
+                          <button
+                            type="button"
+                            onClick={() => handleDuplicateYesterday(slot)}
+                            className="inline-flex items-center gap-1 text-[11px] text-blue-400 hover:underline"
+                          >
+                            <CopyIcon className="w-3 h-3" /> Copier hier
+                          </button>
+                        </div>
+                      ) : !isExpanded ? (
+                        <div
+                          onClick={() =>
+                            setExpandedMeals((prev) => ({ ...prev, [slot]: true }))
+                          }
+                          className="cursor-pointer pt-1 text-xs text-zinc-400 space-y-0.5"
+                        >
+                          <p className="text-zinc-300 truncate">
+                            {items[0].foodName}
+                            {items.length > 1 ? ` et ${items.length - 1} de plus` : ""}
+                          </p>
+                          <p>{slotKcal} cal</p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-white/[0.06] pt-1 border-t border-white/[0.05]">
+                          {items.map((item) => (
+                            <div
+                              key={item.id}
+                              className="py-2 flex items-center justify-between gap-2 text-xs"
+                            >
+                              <div className="min-w-0">
+                                <p className="font-medium text-zinc-200 truncate">{item.foodName}</p>
+                                <p className="text-[11px] text-zinc-400">
+                                  {item.quantityG} g · P {item.nutrients.proteinG}g · G{" "}
+                                  {item.nutrients.carbsG}g · L {item.nutrients.fatG}g
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="font-mono text-blue-400 font-semibold">
+                                  {item.nutrients.kcal} cal
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteFoodLog(item.id)}
+                                  className="text-zinc-500 hover:text-rose-400 p-1"
+                                  title="Supprimer"
+                                >
+                                  <TrashIcon />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-center gap-4 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowFullJournal((v) => !v)}
+                  className="text-sm font-semibold text-blue-400 hover:text-blue-300"
+                >
+                  {showFullJournal ? "Réduire le journal" : "Journal complet"}
+                </button>
+                <span className="text-zinc-600">•</span>
+                <button
+                  type="button"
+                  onClick={() => handleDuplicateYesterday()}
+                  className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200"
+                >
+                  <CopyIcon className="w-3.5 h-3.5" /> Dupliquer hier
+                </button>
+              </div>
+            </section>
+
+            {/* Habitudes saines */}
+            <section className="space-y-2.5">
+              <h2 className="text-lg font-bold">Habitudes saines</h2>
+              <div className={`rounded-2xl border divide-y divide-white/[0.06] ${cardSurface}`}>
+                {/* Eau */}
+                <div className="p-4 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">Eau</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      {dayWaterMl} ml / {state.goals.targetWaterMl} ml
+                    </p>
                   </div>
-                );
-              })}
+                  <div className="flex items-center gap-1.5">
+                    {[250, 500].map((ml) => (
+                      <button
+                        key={ml}
+                        type="button"
+                        onClick={() => handleAddWater(ml)}
+                        className="px-2.5 py-1 rounded-full bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 text-xs font-semibold"
+                      >
+                        +{ml} ml
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Jeûne */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("fasting")}
+                  className="w-full p-4 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02] transition"
+                >
+                  <div>
+                    <p className="text-sm font-semibold">Jeûne intermittent</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      {fastingStatus.currentFastHours.toFixed(1)}h / {state.profile.fastingTargetHours}h
+                      {" · "}
+                      {fastingStatus.isFastingWindow ? "En cours" : "Fenêtre active"}
+                    </p>
+                  </div>
+                  <ChevronRightIcon className="w-4 h-4 text-zinc-400 shrink-0" />
+                </button>
+
+                {/* Pas */}
+                <div className="p-4 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("analytics")}
+                    className="text-left flex-1"
+                  >
+                    <p className="text-sm font-semibold">Pas</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      {daySteps.toLocaleString("fr-FR")} pas aujourd&apos;hui
+                    </p>
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleLogSteps(selectedDate, daySteps + 1000)}
+                      className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-xs font-medium text-zinc-300"
+                    >
+                      +1 000
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("analytics")}
+                      className="text-zinc-400 hover:text-zinc-200 p-1"
+                      aria-label="Voir les pas"
+                    >
+                      <ChevronRightIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Poids */}
+            <section className="space-y-2.5">
+              <h2 className="text-lg font-bold">Poids</h2>
+              <button
+                type="button"
+                onClick={() => setActiveTab("analytics")}
+                className={`w-full rounded-2xl border p-4 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02] transition ${cardSurface}`}
+              >
+                <div>
+                  <p className="text-xl font-bold">
+                    {weightTrends.latestWeight ? `${weightTrends.latestWeight} kg` : "—"}
+                  </p>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    3j : {weightTrends.ma3Latest ?? "—"} · 5j : {weightTrends.ma5Latest ?? "—"} ·{" "}
+                    <span className="capitalize text-blue-400">{weightTrends.status3}</span>
+                  </p>
+                </div>
+                <ChevronRightIcon className="w-4 h-4 text-zinc-400 shrink-0" />
+              </button>
+            </section>
+
+            {/* Notes */}
+            <section className="space-y-2.5">
+              <h2 className="text-lg font-bold">Notes</h2>
+              <div className={`rounded-2xl border px-4 py-3 flex items-center gap-3 ${cardSurface}`}>
+                <input
+                  type="text"
+                  value={dailyNote}
+                  onChange={(e) => handleUpdateNote(e.target.value)}
+                  placeholder="Ajouter une remarque"
+                  className="flex-1 bg-transparent text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
+                />
+                <PencilIcon className="w-4 h-4 text-zinc-400 shrink-0" />
+              </div>
             </section>
           </>
         )}
@@ -609,69 +883,153 @@ export function MacroPulseApp() {
         )}
       </main>
 
-      {/* Bottom Navigation Bar avec bouton central '+' */}
-      <nav
-        className={`fixed bottom-0 inset-x-0 z-40 border-t backdrop-blur-md ${
-          isDark ? "bg-zinc-950/90 border-zinc-800" : "bg-white/90 border-zinc-200"
-        }`}
-      >
-        <div className="max-w-3xl mx-auto px-3 py-2 grid grid-cols-5 items-center">
-          <button
-            type="button"
-            onClick={() => setActiveTab("today")}
-            className={`flex flex-col items-center gap-0.5 py-1 text-[11px] ${
-              activeTab === "today" ? "text-emerald-400 font-semibold" : "text-zinc-500"
+      {/* Floating Bottom Navigation (Aujourd'hui / Progression + FAB '+') */}
+      <nav className="fixed bottom-4 inset-x-0 z-40 px-4 pointer-events-none">
+        <div className="max-w-md mx-auto flex items-center gap-3">
+          <div
+            className={`pointer-events-auto flex-1 rounded-full border backdrop-blur-xl p-1.5 grid grid-cols-2 shadow-xl ${
+              isDark
+                ? "bg-[#1b202e]/85 border-white/10"
+                : "bg-white/90 border-zinc-200"
             }`}
           >
-            <HomeIcon className="w-5 h-5" />
-            <span>Journal</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("analytics")}
-            className={`flex flex-col items-center gap-0.5 py-1 text-[11px] ${
-              activeTab === "analytics" ? "text-emerald-400 font-semibold" : "text-zinc-500"
-            }`}
-          >
-            <ChartIcon className="w-5 h-5" />
-            <span>Courbes</span>
-          </button>
-
-          <div className="flex justify-center">
             <button
               type="button"
-              onClick={() => setQuickAddOpen(true)}
-              className="-mt-6 w-14 h-14 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 shadow-lg shadow-emerald-500/25 flex items-center justify-center transition transform active:scale-95"
-              title="Ajout rapide (Scan / Photo IA / Texte IA / Manuel)"
+              onClick={() => setActiveTab("today")}
+              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-full text-[11px] font-medium transition ${
+                activeTab === "today"
+                  ? isDark
+                    ? "bg-[#282f42] text-white"
+                    : "bg-zinc-900 text-white"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
             >
-              <PlusIcon className="w-7 h-7" />
+              <HomeIcon className="w-5 h-5" />
+              <span>Aujourd&apos;hui</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("analytics")}
+              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-full text-[11px] font-medium transition ${
+                activeTab === "analytics"
+                  ? isDark
+                    ? "bg-[#282f42] text-white"
+                    : "bg-zinc-900 text-white"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <ChartIcon className="w-5 h-5" />
+              <span>Progression</span>
             </button>
           </div>
 
           <button
             type="button"
-            onClick={() => setActiveTab("fasting")}
-            className={`flex flex-col items-center gap-0.5 py-1 text-[11px] ${
-              activeTab === "fasting" ? "text-emerald-400 font-semibold" : "text-zinc-500"
-            }`}
+            onClick={() => setAddSheetOpen(true)}
+            className="pointer-events-auto w-14 h-14 rounded-full bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-500/35 flex items-center justify-center transition transform active:scale-95 shrink-0"
+            title="Ajouter un aliment, scanner un code-barres ou suivre une habitude"
           >
-            <ClockIcon className="w-5 h-5" />
-            <span>Jeûne</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("goals")}
-            className={`flex flex-col items-center gap-0.5 py-1 text-[11px] ${
-              activeTab === "goals" ? "text-emerald-400 font-semibold" : "text-zinc-500"
-            }`}
-          >
-            <SettingsIcon className="w-5 h-5" />
-            <span>Objectifs</span>
+            <PlusIcon className="w-7 h-7" />
           </button>
         </div>
       </nav>
+
+      {/* Bottom Action Sheet on '+' click */}
+      {addSheetOpen && (
+        <div
+          onClick={() => setAddSheetOpen(false)}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center p-3"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-3xl bg-[#1b202e]/95 border border-white/15 p-4 space-y-3 shadow-2xl"
+          >
+            <div className="flex items-center justify-between px-1">
+              <span className="text-sm font-bold text-blue-400">MacroPulse</span>
+              <button
+                type="button"
+                onClick={() => setAddSheetOpen(false)}
+                className="p-1 text-zinc-400 hover:text-zinc-200"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => openQuickAdd("all", "lunch")}
+                className="flex flex-col items-center justify-center gap-2.5 py-6 px-3 rounded-2xl bg-[#252b3d] hover:bg-[#2d354b] transition"
+              >
+                <span className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                  <SearchIcon className="w-5 h-5" />
+                </span>
+                <span className="text-xs font-semibold text-zinc-100 text-center">
+                  Consigner un aliment
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openQuickAdd("barcode", "lunch")}
+                className="flex flex-col items-center justify-center gap-2.5 py-6 px-3 rounded-2xl bg-[#252b3d] hover:bg-[#2d354b] transition"
+              >
+                <span className="w-10 h-10 rounded-full bg-rose-500 flex items-center justify-center text-white">
+                  <BarcodeIcon className="w-5 h-5" />
+                </span>
+                <span className="text-xs font-semibold text-zinc-100 text-center">
+                  Scan de code-barres
+                </span>
+              </button>
+            </div>
+
+            <div className="rounded-2xl bg-[#252b3d] divide-y divide-white/[0.06] overflow-hidden">
+              <button
+                type="button"
+                onClick={() => openQuickAdd("photo", "lunch")}
+                className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-100 hover:bg-white/[0.04] transition"
+              >
+                <SparklesIcon className="w-4 h-4 text-emerald-400" />
+                <span>Photo / Texte IA (Gemini)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleAddWater(250);
+                  setAddSheetOpen(false);
+                }}
+                className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-100 hover:bg-white/[0.04] transition"
+              >
+                <DropletIcon className="w-4 h-4 text-blue-400" />
+                <span>Eau (+250 ml)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddSheetOpen(false);
+                  setActiveTab("analytics");
+                }}
+                className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-100 hover:bg-white/[0.04] transition"
+              >
+                <ScaleIcon className="w-4 h-4 text-emerald-400" />
+                <span>Poids & Pas</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddSheetOpen(false);
+                  setActiveTab("fasting");
+                }}
+                className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-100 hover:bg-white/[0.04] transition"
+              >
+                <ClockIcon className="w-4 h-4 text-amber-400" />
+                <span>Jeûne intermittent</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <QuickAddModal
         open={quickAddOpen}
@@ -679,6 +1037,8 @@ export function MacroPulseApp() {
         selectedDate={selectedDate}
         foods={state.foods}
         recipes={state.recipes}
+        initialTab={quickAddTab}
+        initialMealSlot={quickAddSlot}
         onAddFoodLogs={handleAddFoodLogs}
         onSaveCustomFood={handleSaveCustomFood}
       />

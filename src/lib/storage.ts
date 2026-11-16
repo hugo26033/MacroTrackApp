@@ -18,6 +18,7 @@ export interface AppState {
   weights: WeightEntry[];
   steps: StepEntry[];
   waterLogs: WaterEntry[];
+  dailyNotes?: Record<string, string>;
 }
 
 const STORAGE_KEY = "macropulse_state_v1";

@@ -9,9 +9,18 @@ import type {
   MealSlot,
   Recipe,
 } from "@/lib/types";
-import { BarcodeIcon, CameraIcon, PlusIcon, SparklesIcon, TrashIcon } from "./Icons";
+import {
+  BarcodeIcon,
+  CameraIcon,
+  ChevronDownIcon,
+  PlusIcon,
+  SearchIcon,
+  SparklesIcon,
+  TrashIcon,
+  XIcon,
+} from "./Icons";
 
-type TabMode = "barcode" | "photo" | "text" | "manual";
+export type QuickAddTabMode = "all" | "recipes" | "foods" | "barcode" | "photo" | "text" | "manual";
 
 interface QuickAddModalProps {
   open: boolean;
@@ -19,15 +28,17 @@ interface QuickAddModalProps {
   selectedDate: string;
   foods: FoodItem[];
   recipes: Recipe[];
+  initialTab?: QuickAddTabMode;
+  initialMealSlot?: MealSlot;
   onAddFoodLogs: (logs: Omit<FoodLogEntry, "id">[]) => void;
   onSaveCustomFood: (food: FoodItem) => void;
 }
 
 const MEAL_SLOTS: { value: MealSlot; label: string }[] = [
-  { value: "breakfast", label: "Petit-déj" },
+  { value: "breakfast", label: "Petit déjeuner" },
   { value: "lunch", label: "Déjeuner" },
   { value: "dinner", label: "Dîner" },
-  { value: "snack", label: "Collation" },
+  { value: "snack", label: "Snacks" },
 ];
 
 export function QuickAddModal({
@@ -36,11 +47,14 @@ export function QuickAddModal({
   selectedDate,
   foods,
   recipes,
+  initialTab = "all",
+  initialMealSlot = "lunch",
   onAddFoodLogs,
   onSaveCustomFood,
 }: QuickAddModalProps) {
-  const [tab, setTab] = useState<TabMode>("barcode");
-  const [mealSlot, setMealSlot] = useState<MealSlot>("lunch");
+  const [tab, setTab] = useState<QuickAddTabMode>(initialTab);
+  const [mealSlot, setMealSlot] = useState<MealSlot>(initialMealSlot);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Barcode state
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -71,11 +85,15 @@ export function QuickAddModal({
   const [manualFiber, setManualFiber] = useState(2);
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      setTab(initialTab);
+      setMealSlot(initialMealSlot);
+      setSearchQuery("");
+    } else {
       stopCamera();
     }
     return () => stopCamera();
-  }, [open]);
+  }, [open, initialTab, initialMealSlot]);
 
   useEffect(() => {
     if (scanningCamera && videoRef.current && streamRef.current) {
@@ -447,67 +465,210 @@ export function QuickAddModal({
 
   if (!open) return null;
 
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredFoods = foods.filter(
+    (f) =>
+      !normalizedQuery ||
+      f.name.toLowerCase().includes(normalizedQuery) ||
+      (f.brand && f.brand.toLowerCase().includes(normalizedQuery))
+  );
+  const filteredRecipes = recipes.filter(
+    (r) => !normalizedQuery || r.name.toLowerCase().includes(normalizedQuery)
+  );
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
-      <div className="w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-zinc-900 border border-zinc-800 text-zinc-100 shadow-2xl p-5 space-y-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Ajout rapide</h2>
-            <p className="text-xs text-zinc-400">Date : {selectedDate}</p>
-          </div>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-sm p-0 sm:p-4">
+      <div className="w-full max-w-xl max-h-[94vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[#0f131d] border border-white/10 text-zinc-100 shadow-2xl p-5 space-y-4">
+        {/* Top Bar: Close + Meal Slot Dropdown */}
+        <div className="flex items-center justify-between gap-3">
           <button
+            type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-medium"
+            className="w-10 h-10 rounded-full bg-[#1e2433] hover:bg-[#272e40] flex items-center justify-center text-zinc-200 transition"
+            aria-label="Fermer"
           >
-            Fermer
+            <XIcon className="w-4 h-4" />
           </button>
-        </div>
 
-        {/* Sélecteur de repas */}
-        <div className="grid grid-cols-4 gap-1.5 bg-zinc-950 p-1 rounded-2xl border border-zinc-800">
-          {MEAL_SLOTS.map((slot) => (
-            <button
-              key={slot.value}
-              type="button"
-              onClick={() => setMealSlot(slot.value)}
-              className={`py-2 rounded-xl text-xs font-medium transition ${
-                mealSlot === slot.value
-                  ? "bg-emerald-500 text-zinc-950 font-semibold"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
+          <div className="relative inline-flex items-center">
+            <select
+              value={mealSlot}
+              onChange={(e) => setMealSlot(e.target.value as MealSlot)}
+              className="appearance-none bg-transparent pr-6 pl-2 py-1 text-sm font-semibold text-blue-400 focus:outline-none cursor-pointer"
             >
-              {slot.label}
-            </button>
-          ))}
+              {MEAL_SLOTS.map((slot) => (
+                <option key={slot.value} value={slot.value} className="bg-[#181d2a] text-zinc-100">
+                  {slot.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon className="w-4 h-4 text-blue-400 pointer-events-none -ml-5" />
+          </div>
+
+          <span className="text-[11px] font-mono text-zinc-500 min-w-[70px] text-right">
+            {selectedDate.slice(5)}
+          </span>
         </div>
 
-        {/* Onglets */}
-        <div className="grid grid-cols-4 gap-2">
+        {/* Search Bar */}
+        <div className="relative flex items-center">
+          <SearchIcon className="w-4 h-4 text-zinc-400 absolute left-3.5 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              if (tab !== "all" && tab !== "foods" && tab !== "recipes") {
+                setTab("all");
+              }
+            }}
+            placeholder="Rechercher un aliment ou une recette..."
+            className="w-full rounded-full bg-[#181d2a] border border-white/10 pl-10 pr-9 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-blue-500"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 text-zinc-400 hover:text-zinc-200"
+            >
+              <XIcon className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Underline Tabs */}
+        <div className="flex items-center gap-4 overflow-x-auto border-b border-white/10 pb-0.5 no-scrollbar">
           {[
-            { id: "barcode", label: "Code-barres", icon: BarcodeIcon },
-            { id: "photo", label: "Photo IA", icon: CameraIcon },
-            { id: "text", label: "Texte IA", icon: SparklesIcon },
-            { id: "manual", label: "Manuel", icon: PlusIcon },
+            { id: "all", label: "Tous" },
+            { id: "recipes", label: "Mes recettes" },
+            { id: "foods", label: "Mes aliments" },
+            { id: "barcode", label: "Code-barres" },
+            { id: "photo", label: "Photo IA" },
+            { id: "text", label: "Texte IA" },
+            { id: "manual", label: "Manuel" },
           ].map((item) => {
-            const Icon = item.icon;
             const active = tab === item.id;
             return (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setTab(item.id as TabMode)}
-                className={`flex flex-col items-center gap-1 py-2.5 px-2 rounded-2xl border text-xs font-medium transition ${
+                onClick={() => setTab(item.id as QuickAddTabMode)}
+                className={`whitespace-nowrap pb-2.5 text-xs font-medium border-b-2 transition ${
                   active
-                    ? "bg-emerald-500/15 border-emerald-500/60 text-emerald-300"
-                    : "bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                    ? "border-white text-white"
+                    : "border-transparent text-zinc-400 hover:text-zinc-200"
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                <span>{item.label}</span>
+                {item.label}
               </button>
             );
           })}
         </div>
+
+        {/* TAB: TOUS / MES RECETTES / MES ALIMENTS */}
+        {(tab === "all" || tab === "recipes" || tab === "foods") && (
+          <div className="space-y-4">
+            {tab === "all" && (
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTab("barcode")}
+                  className="flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-2xl bg-[#181d2a] hover:bg-[#1f2535] border border-white/[0.06] transition"
+                >
+                  <BarcodeIcon className="w-6 h-6 text-blue-400" />
+                  <span className="text-xs font-medium text-blue-400">Scan de code-barres</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("photo")}
+                  className="flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-2xl bg-[#181d2a] hover:bg-[#1f2535] border border-white/[0.06] transition"
+                >
+                  <SparklesIcon className="w-6 h-6 text-blue-400" />
+                  <span className="text-xs font-medium text-blue-400">Photo IA / Ajout rapide</span>
+                </button>
+              </div>
+            )}
+
+            {(tab === "all" || tab === "recipes") && filteredRecipes.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-zinc-100">Mes recettes</h3>
+                <div className="space-y-2">
+                  {filteredRecipes.map((r) => (
+                    <div
+                      key={r.id}
+                      className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#181d2a] border border-white/[0.06]"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-zinc-100 truncate">{r.name}</p>
+                        <p className="text-xs text-zinc-400">
+                          {r.perServing.kcal} cal, 1 portion (P {r.perServing.proteinG}g · G {r.perServing.carbsG}g · L {r.perServing.fatG}g)
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAddRecipe(r)}
+                        className="shrink-0 w-9 h-9 rounded-full bg-[#242b3d] hover:bg-blue-500 text-blue-400 hover:text-white flex items-center justify-center transition"
+                        title="Ajouter cette recette"
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(tab === "all" || tab === "foods") && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-zinc-100">
+                    {normalizedQuery ? "Résultats" : "Récemment consignés"}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setTab("manual")}
+                    className="text-xs text-blue-400 hover:underline"
+                  >
+                    + Créer un aliment
+                  </button>
+                </div>
+                {filteredFoods.length === 0 ? (
+                  <p className="text-xs text-zinc-500 py-4 text-center">
+                    Aucun aliment trouvé. Essaie le scan de code-barres, Photo IA ou « Créer un aliment ».
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredFoods.map((f) => {
+                      const scaled = scaleNutrients(f.per100g, f.servingSizeG);
+                      return (
+                        <div
+                          key={f.id}
+                          className="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-[#181d2a] border border-white/[0.06]"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-zinc-100 truncate">{f.name}</p>
+                            <p className="text-xs text-zinc-400 truncate">
+                              {scaled.kcal} cal, {f.servingLabel}
+                              {f.brand ? `, ${f.brand}` : ""}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickAddSavedFood(f)}
+                            className="shrink-0 w-9 h-9 rounded-full bg-[#242b3d] hover:bg-blue-500 text-blue-400 hover:text-white flex items-center justify-center transition"
+                            title="Consigner cet aliment"
+                          >
+                            <PlusIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* TAB 1: BARCODE */}
         {tab === "barcode" && (
