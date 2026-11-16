@@ -112,6 +112,9 @@ export interface FoodLogEntry {
 export interface RecipeItem {
   foodName: string;
   quantityG: number;
+  unitType?: "grams" | "unit";
+  unitLabel?: string;
+  unitWeightG?: number;
   per100g: NutrientValues;
 }
 
