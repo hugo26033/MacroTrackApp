@@ -99,7 +99,9 @@ export function QuickAddModal({
 
   // Manual food creation state
   const [manualName, setManualName] = useState("");
+  const [manualBarcode, setManualBarcode] = useState("");
   const [manualSavedMsg, setManualSavedMsg] = useState<string | null>(null);
+  const [barcodeSavedMsg, setBarcodeSavedMsg] = useState<string | null>(null);
   const [manualUnitType, setManualUnitType] = useState<"grams" | "unit">("grams");
   const [manualUnitLabel, setManualUnitLabel] = useState("unité");
   const [manualUnitCount, setManualUnitCount] = useState(1);
@@ -386,7 +388,18 @@ export function QuickAddModal({
     if (!code) return;
     setBarcodeLoading(true);
     setBarcodeError(null);
+    setBarcodeSavedMsg(null);
     setFoundProduct(null);
+
+    const localMatch = foods.find((f) => f.barcode && f.barcode === code);
+    if (localMatch) {
+      setFoundProduct(localMatch);
+      const lastLog = getLastLoggedForFood(localMatch);
+      setProductQtyG(lastLog?.quantityG ?? (localMatch.servingSizeG || 100));
+      setBarcodeLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch(`/api/barcode?code=${encodeURIComponent(code)}`);
       const data = await res.json();
@@ -717,6 +730,7 @@ export function QuickAddModal({
 
     return {
       id: `custom-${Date.now()}`,
+      barcode: manualBarcode.trim() || undefined,
       name: manualName.trim(),
       servingSizeG: baseG,
       servingLabel: isUnit ? `1 ${cleanUnitLabel} (${baseG} g)` : `${baseG} g`,
@@ -739,6 +753,7 @@ export function QuickAddModal({
     onSaveCustomFood(customFood);
     setManualSavedMsg(`« ${customFood.name} » enregistré dans Mes aliments.`);
     setManualName("");
+    setManualBarcode("");
   }
 
   function handleAddManualCustom(e: React.FormEvent) {
@@ -1895,8 +1910,21 @@ export function QuickAddModal({
             )}
 
             {barcodeError && (
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
-                {barcodeError}
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs space-y-2">
+                <p>{barcodeError}</p>
+                {barcodeInput.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualBarcode(barcodeInput.trim());
+                      setManualSavedMsg(null);
+                      setTab("manual");
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-400 text-white font-semibold text-xs"
+                  >
+                    Créer un aliment avec le code-barres {barcodeInput.trim()}
+                  </button>
+                )}
               </div>
             )}
 
@@ -1948,13 +1976,31 @@ export function QuickAddModal({
                   );
                 })()}
 
-                <button
-                  type="button"
-                  onClick={handleConfirmBarcode}
-                  className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-sm"
-                >
-                  Ajouter au journal
-                </button>
+                {barcodeSavedMsg && (
+                  <p className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2">
+                    {barcodeSavedMsg}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSaveCustomFood(foundProduct);
+                      setBarcodeSavedMsg(`« ${foundProduct.name} » enregistré dans Mes aliments.`);
+                    }}
+                    className="py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-semibold text-sm"
+                  >
+                    Créer dans Mes aliments
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmBarcode}
+                    className="py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-sm"
+                  >
+                    Ajouter au journal
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -2222,6 +2268,14 @@ export function QuickAddModal({
                     : "Nom de l'aliment"
                 }
                 className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm"
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                value={manualBarcode}
+                onChange={(e) => setManualBarcode(e.target.value)}
+                placeholder="Code-barres (optionnel, ex: 3017620422003)"
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 text-xs font-mono text-zinc-300"
               />
 
               {manualUnitType === "unit" && (
