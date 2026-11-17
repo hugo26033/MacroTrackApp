@@ -927,8 +927,15 @@ export function MacroPulseApp() {
             trendThresholdKgWeek={state.profile.weightTrendThresholdKgWeek}
             selectedDate={selectedDate}
             onLogWeight={handleLogWeight}
+            onDeleteWeight={(date) =>
+              setState((prev) => ({
+                ...prev,
+                weights: prev.weights.filter((w) => w.logDate !== date),
+              }))
+            }
             onLogSteps={handleLogSteps}
             onImportSteps={handleImportSteps}
+            onBack={() => setActiveTab("today")}
           />
         )}
 

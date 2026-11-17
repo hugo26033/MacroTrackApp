@@ -98,6 +98,7 @@ export function QuickAddModal({
 
   // Manual food creation state
   const [manualName, setManualName] = useState("");
+  const [manualSavedMsg, setManualSavedMsg] = useState<string | null>(null);
   const [manualUnitType, setManualUnitType] = useState<"grams" | "unit">("grams");
   const [manualUnitLabel, setManualUnitLabel] = useState("unité");
   const [manualUnitCount, setManualUnitCount] = useState(1);
@@ -679,17 +680,14 @@ export function QuickAddModal({
     setCreatingRecipe(false);
   }
 
-  function handleAddManualCustom(e: React.FormEvent) {
-    e.preventDefault();
-    if (!manualName.trim()) return;
+  function buildManualFood(): FoodItem | null {
+    if (!manualName.trim()) return null;
     const isUnit = manualUnitType === "unit";
     const baseG = Math.max(1, manualQty);
     const factor = 100 / baseG;
     const cleanUnitLabel = manualUnitLabel.trim() || "unité";
-    const count = isUnit ? Math.max(0.25, manualUnitCount) : 1;
-    const loggedG = Math.round(baseG * count * 10) / 10;
 
-    const customFood: FoodItem = {
+    return {
       id: `custom-${Date.now()}`,
       name: manualName.trim(),
       servingSizeG: baseG,
@@ -705,6 +703,26 @@ export function QuickAddModal({
       },
       source: "manual",
     };
+  }
+
+  function handleCreateFoodOnly() {
+    const customFood = buildManualFood();
+    if (!customFood) return;
+    onSaveCustomFood(customFood);
+    setManualSavedMsg(`« ${customFood.name} » enregistré dans Mes aliments.`);
+    setManualName("");
+  }
+
+  function handleAddManualCustom(e: React.FormEvent) {
+    e.preventDefault();
+    const customFood = buildManualFood();
+    if (!customFood) return;
+    const isUnit = manualUnitType === "unit";
+    const baseG = Math.max(1, manualQty);
+    const cleanUnitLabel = manualUnitLabel.trim() || "unité";
+    const count = isUnit ? Math.max(0.25, manualUnitCount) : 1;
+    const loggedG = Math.round(baseG * count * 10) / 10;
+
     onSaveCustomFood(customFood);
     onAddFoodLogs([
       {
@@ -2272,12 +2290,27 @@ export function QuickAddModal({
                   />
                 </label>
               </div>
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-sm"
-              >
-                Enregistrer & ajouter
-              </button>
+              {manualSavedMsg && (
+                <p className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2">
+                  {manualSavedMsg}
+                </p>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleCreateFoodOnly}
+                  disabled={!manualName.trim()}
+                  className="py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-semibold text-sm disabled:opacity-40"
+                >
+                  Créer
+                </button>
+                <button
+                  type="submit"
+                  className="py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-sm"
+                >
+                  Créer & ajouter
+                </button>
+              </div>
             </form>
           </div>
         )}
