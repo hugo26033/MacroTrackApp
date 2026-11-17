@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { callGeminiJSON } from "@/lib/gemini";
 import type { MealSlot } from "@/lib/types";
+
+export const maxDuration = 30;
 
 interface SuggestRequest {
   mode: "complete" | "plan_day";
@@ -51,53 +54,17 @@ Règles :
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as SuggestRequest;
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "Clé GEMINI_API_KEY manquante côté serveur." },
-        { status: 503 }
-      );
-    }
-
-    const model = process.env.GEMINI_MODEL || "gemini-4-hydrogen";
     const userPrompt = `${PROMPT}
 
 Mode : ${body.mode === "plan_day" ? "Planifier toute la journée" : `Compléter un repas (${body.mealSlot ?? "dinner"})`}
 Cible : ${Math.round(body.target.kcal)} kcal, ${Math.round(body.target.proteinG)}g Protéines, ${Math.round(body.target.fatG)}g Lipides, ${Math.round(body.target.carbsG)}g Glucides.
 Préférences / aliments disponibles : ${body.preference?.trim() || "Aucune contrainte particulière, alimentation équilibrée et simple."}`;
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-        model
-      )}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-          generationConfig: {
-            temperature: 0.3,
-            responseMimeType: "application/json",
-          },
-        }),
-      }
-    );
+    const parsed = await callGeminiJSON<{ foods?: SuggestedOptimizerFood[] }>({
+      parts: [{ text: userPrompt }],
+      temperature: 0.3,
+    });
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      return NextResponse.json(
-        { error: `Erreur Gemini (${geminiRes.status}) : ${errText.slice(0, 180)}` },
-        { status: 502 }
-      );
-    }
-
-    const geminiJson = await geminiRes.json();
-    const rawText = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!rawText) {
-      return NextResponse.json({ error: "Réponse vide de Gemini." }, { status: 502 });
-    }
-
-    const parsed = JSON.parse(rawText) as { foods?: SuggestedOptimizerFood[] };
     const foods = Array.isArray(parsed.foods) ? parsed.foods : [];
     return NextResponse.json({ foods });
   } catch (err) {
@@ -108,7 +75,7 @@ Préférences / aliments disponibles : ${body.preference?.trim() || "Aucune cont
             ? `Erreur suggestion Gemini : ${err.message}`
             : "Erreur inconnue.",
       },
-      { status: 500 }
+      { status: 502 }
     );
   }
 }

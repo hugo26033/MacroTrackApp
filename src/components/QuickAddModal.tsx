@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { scaleNutrients, sumNutrients } from "@/lib/calculations";
+import { compressImageFile } from "@/lib/imageUtils";
 import {
   MICRONUTRIENT_CATALOG,
   type FoodItem,
@@ -269,33 +270,46 @@ export function QuickAddModal({
     setFoundProduct(null);
     setBarcodeLoading(true);
 
-    const mime = file.type || "image/jpeg";
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUrl = String(reader.result);
+    try {
+      const { dataUrl, mimeType } = await compressImageFile(file, 1280, 0.85);
       setBarcodePhotoPreview(dataUrl);
+
+      // 1. Essai local instantané (ZXing WASM / BarcodeDetector natif, 0 quota Gemini)
       try {
-        const res = await fetch("/api/ai/read-barcode", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageBase64: dataUrl, mimeType: mime }),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.barcode) {
-          setBarcodeError(data.error || "Code-barres illisible sur la photo.");
-          setBarcodeLoading(false);
+        const detector = await getBarcodeDetector();
+        const bitmap = await createImageBitmap(file);
+        const codes = await detector.detect(bitmap);
+        bitmap.close?.();
+        if (codes.length > 0 && codes[0].rawValue) {
+          const code = codes[0].rawValue;
+          setBarcodeInput(code);
+          await lookupBarcode(code);
           return;
         }
-        setBarcodeInput(data.barcode);
-        await lookupBarcode(data.barcode);
       } catch {
-        setBarcodeError("Impossible de lire le code-barres via Gemini.");
-        setBarcodeLoading(false);
-      } finally {
-        input.value = "";
+        // Fallback vers Gemini ci-dessous
       }
-    };
-    reader.readAsDataURL(file);
+
+      // 2. Fallback Gemini (image compressée ~120 Ko + retry/fallback serveur)
+      const res = await fetch("/api/ai/read-barcode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: dataUrl, mimeType }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.barcode) {
+        setBarcodeError(data.error || "Code-barres illisible sur la photo.");
+        setBarcodeLoading(false);
+        return;
+      }
+      setBarcodeInput(data.barcode);
+      await lookupBarcode(data.barcode);
+    } catch {
+      setBarcodeError("Impossible de lire le code-barres.");
+      setBarcodeLoading(false);
+    } finally {
+      input.value = "";
+    }
   }
 
   function formatCameraError(err: unknown): string {
@@ -411,14 +425,16 @@ export function QuickAddModal({
   }
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
-    setPhotoMime(file.type || "image/jpeg");
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPhotoPreview(String(reader.result));
-    };
-    reader.readAsDataURL(file);
+    try {
+      const { dataUrl, mimeType } = await compressImageFile(file, 1024, 0.82);
+      setPhotoMime(mimeType);
+      setPhotoPreview(dataUrl);
+    } finally {
+      input.value = "";
+    }
   }
 
   async function runGeminiAnalysis(mode: "photo" | "text") {

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { callGeminiJSON } from "@/lib/gemini";
 import type { GeminiDetectedFood } from "@/lib/types";
+
+export const maxDuration = 30;
 
 interface AnalyzeRequest {
   text?: string;
@@ -42,18 +45,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        {
-          error:
-            "Clé GEMINI_API_KEY manquante dans .env.local. Ajoute-la côté serveur pour activer la reconnaissance IA Gemini.",
-        },
-        { status: 503 }
-      );
-    }
-
-    const model = process.env.GEMINI_MODEL || "gemini-4-hydrogen";
     const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [
       {
         text: text
@@ -72,43 +63,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-        model
-      )}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts }],
-          generationConfig: {
-            temperature: 0.2,
-            responseMimeType: "application/json",
-          },
-        }),
-      }
-    );
+    const parsed = await callGeminiJSON<{ items?: GeminiDetectedFood[] }>({
+      parts,
+      temperature: 0.2,
+    });
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      return NextResponse.json(
-        { error: `Erreur API Gemini (${geminiRes.status}) : ${errText.slice(0, 200)}` },
-        { status: 502 }
-      );
-    }
-
-    const geminiJson = await geminiRes.json();
-    const rawText = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!rawText) {
-      return NextResponse.json(
-        { error: "Réponse vide reçue de Gemini." },
-        { status: 502 }
-      );
-    }
-
-    const parsed = JSON.parse(rawText) as { items?: GeminiDetectedFood[] };
     const items = Array.isArray(parsed.items) ? parsed.items : [];
-
     return NextResponse.json({ items });
   } catch (err) {
     return NextResponse.json(
@@ -118,7 +78,7 @@ export async function POST(req: NextRequest) {
             ? `Erreur d'analyse Gemini : ${err.message}`
             : "Erreur inconnue lors de l'analyse.",
       },
-      { status: 500 }
+      { status: 502 }
     );
   }
 }
