@@ -16,7 +16,7 @@ import type {
   WeightEntry,
 } from "@/lib/types";
 import { BarHistoryChart, WeightTrendChart } from "./Charts";
-import { ChartIcon, FootprintsIcon, PlusIcon, TrashIcon, XIcon } from "./Icons";
+import { ChartIcon, PlusIcon, TrashIcon, XIcon } from "./Icons";
 
 interface AnalyticsViewProps {
   weights: WeightEntry[];
@@ -52,6 +52,15 @@ const METRIC_LABELS: Record<MetricView, string> = {
   steps: "Pas",
 };
 
+function formatFullFrenchDate(isoDate: string): string {
+  return new Date(`${isoDate}T12:00:00`).toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export function AnalyticsView({
   weights,
   steps,
@@ -67,11 +76,17 @@ export function AnalyticsView({
 }: AnalyticsViewProps) {
   const [metric, setMetric] = useState<MetricView>("weight");
   const [range, setRange] = useState<ChartRange>("week");
+
+  // Weight modal state
   const [weightModalOpen, setWeightModalOpen] = useState(false);
   const [weightDate, setWeightDate] = useState<string>(selectedDate);
   const [weightInput, setWeightInput] = useState<string>(
     weights.length > 0 ? String(weights[weights.length - 1].weightKg) : "70.0"
   );
+
+  // Steps modal & import state
+  const [stepsModalOpen, setStepsModalOpen] = useState(false);
+  const [stepsDate, setStepsDate] = useState<string>(selectedDate);
   const [stepsInput, setStepsInput] = useState<string>("8500");
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
@@ -106,15 +121,33 @@ export function AnalyticsView({
   for (const log of foodLogs) {
     kcalByDate.set(log.logDate, (kcalByDate.get(log.logDate) ?? 0) + log.nutrients.kcal);
   }
+  const kcalEntriesAll = Array.from(kcalByDate.entries())
+    .map(([date, kcal]) => ({ date, kcal }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
   const kcalSeries = aggregateSeriesByRange(
-    Array.from(kcalByDate.entries()).map(([date, value]) => ({ date, value })),
+    kcalEntriesAll.map((e) => ({ date: e.date, value: e.kcal })),
     range
   );
+  const avgKcal =
+    kcalSeries.length > 0
+      ? Math.round(kcalSeries.reduce((s, d) => s + d.value, 0) / kcalSeries.length)
+      : null;
+  const selectedDayKcal = kcalByDate.get(selectedDate) ?? 0;
 
+  // Pas
+  const sortedStepsDesc = [...steps].sort((a, b) =>
+    b.logDate.localeCompare(a.logDate)
+  );
   const stepSeries = aggregateSeriesByRange(
     steps.map((s) => ({ date: s.logDate, value: s.steps })),
     range
   );
+  const avgSteps =
+    stepSeries.length > 0
+      ? Math.round(stepSeries.reduce((s, d) => s + d.value, 0) / stepSeries.length)
+      : null;
+  const selectedDaySteps = steps.find((s) => s.logDate === selectedDate)?.steps ?? 0;
 
   function handleSaveWeight(e: React.FormEvent) {
     e.preventDefault();
@@ -129,7 +162,8 @@ export function AnalyticsView({
     e.preventDefault();
     const val = Number(stepsInput);
     if (Number.isFinite(val) && val >= 0) {
-      onLogSteps(selectedDate, Math.round(val));
+      onLogSteps(stepsDate || selectedDate, Math.round(val));
+      setStepsModalOpen(false);
     }
   }
 
@@ -144,18 +178,46 @@ export function AnalyticsView({
     setImportText("");
   }
 
-  function exportWeightsCSV() {
-    const header = "date,poids_kg";
-    const rows = [...weights]
-      .sort((a, b) => a.logDate.localeCompare(b.logDate))
-      .map((w) => `${w.logDate},${w.weightKg}`);
-    const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv" });
+  function exportActiveCSV() {
+    let filename = "macropulse-poids.csv";
+    let csv = "";
+    if (metric === "weight") {
+      const rows = [...weights]
+        .sort((a, b) => a.logDate.localeCompare(b.logDate))
+        .map((w) => `${w.logDate},${w.weightKg}`);
+      csv = ["date,poids_kg", ...rows].join("\n");
+    } else if (metric === "kcal") {
+      filename = "macropulse-calories.csv";
+      const rows = [...kcalEntriesAll]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((k) => `${k.date},${k.kcal}`);
+      csv = ["date,kcal", ...rows].join("\n");
+    } else {
+      filename = "macropulse-pas.csv";
+      const rows = [...steps]
+        .sort((a, b) => a.logDate.localeCompare(b.logDate))
+        .map((s) => `${s.logDate},${s.steps}`);
+      csv = ["date,pas", ...rows].join("\n");
+    }
+    const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "macropulse-poids.csv";
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function handleTopPlusClick() {
+    if (metric === "steps") {
+      setStepsDate(selectedDate);
+      setStepsInput(String(selectedDaySteps || 8500));
+      setStepsModalOpen(true);
+    } else {
+      setWeightDate(selectedDate);
+      if (currentWeight !== null) setWeightInput(String(currentWeight));
+      setWeightModalOpen(true);
+    }
   }
 
   function cycleMetric() {
@@ -184,28 +246,24 @@ export function AnalyticsView({
         <div className="inline-flex items-center rounded-full bg-[#1a2030] border border-white/10 p-1 gap-1">
           <button
             type="button"
-            onClick={exportWeightsCSV}
+            onClick={exportActiveCSV}
             className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-zinc-300 text-xs"
-            title="Exporter les pesées (CSV)"
+            title="Exporter en CSV"
           >
             📤
           </button>
           <button
             type="button"
-            onClick={() => {
-              setWeightDate(selectedDate);
-              if (currentWeight !== null) setWeightInput(String(currentWeight));
-              setWeightModalOpen(true);
-            }}
+            onClick={handleTopPlusClick}
             className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-zinc-100"
-            title="Ajouter une pesée"
+            title={metric === "steps" ? "Ajouter des pas" : "Ajouter une pesée"}
           >
             <PlusIcon className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* 2-Column Filter Bar (Poids | 1 semaine) */}
+      {/* 2-Column Filter Bar (Poids / Calories / Pas | 1 semaine / 1 mois / 1 an) */}
       <div className="grid grid-cols-2 border-y border-white/[0.06] py-2.5 text-sm">
         <button
           type="button"
@@ -226,10 +284,9 @@ export function AnalyticsView({
         </button>
       </div>
 
-      {/* VUE POIDS (style Measurements) */}
+      {/* VUE POIDS */}
       {metric === "weight" && (
         <>
-          {/* Résumé 3 colonnes : DÉBUT | ACTUEL | MODIFIER */}
           <div className="grid grid-cols-3 gap-2 pt-1 pb-2">
             <div>
               <p className="text-lg font-bold font-mono">
@@ -265,11 +322,9 @@ export function AnalyticsView({
             </div>
           </div>
 
-          {/* Courbe zoomée */}
           <section className="rounded-2xl bg-gradient-to-b from-[#1a2030] to-[#141824] border border-white/[0.07] p-4 space-y-4">
             <WeightTrendChart data={visibleWeightSeries} />
 
-            {/* Badges Tendances 3j / 5j compacts */}
             <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-white/[0.06]">
               <div className="flex items-center justify-between text-xs">
                 <div>
@@ -305,7 +360,6 @@ export function AnalyticsView({
             </div>
           </section>
 
-          {/* Liste des Entrées */}
           <section className="space-y-2 pt-2">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold">Entrées</h3>
@@ -327,45 +381,110 @@ export function AnalyticsView({
               </p>
             ) : (
               <div className="divide-y divide-white/[0.06]">
-                {sortedWeightsDesc.map((entry) => {
-                  const formattedDate = new Date(`${entry.logDate}T12:00:00`).toLocaleDateString(
-                    "fr-FR",
-                    {
-                      weekday: "long",
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    }
-                  );
+                {sortedWeightsDesc.map((entry) => (
+                  <div
+                    key={entry.logDate}
+                    onClick={() => {
+                      setWeightDate(entry.logDate);
+                      setWeightInput(String(entry.weightKg));
+                      setWeightModalOpen(true);
+                    }}
+                    className="cursor-pointer py-3 flex items-center justify-between gap-3 hover:bg-white/[0.02] px-1 rounded-xl transition"
+                  >
+                    <div>
+                      <p className="text-sm font-bold font-mono text-zinc-100">
+                        {entry.weightKg.toString().replace(".", ",")} kg
+                      </p>
+                      <p className="text-xs text-zinc-400 capitalize">
+                        {formatFullFrenchDate(entry.logDate)}
+                      </p>
+                    </div>
+                    {onDeleteWeight && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteWeight(entry.logDate);
+                        }}
+                        className="p-2 text-zinc-500 hover:text-rose-400"
+                        title="Supprimer cette pesée"
+                      >
+                        <TrashIcon />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
+      {/* VUE CALORIES (même style Mesures) */}
+      {metric === "kcal" && (
+        <>
+          <div className="grid grid-cols-3 gap-2 pt-1 pb-2">
+            <div>
+              <p className="text-lg font-bold font-mono">
+                {avgKcal !== null ? `${avgKcal.toLocaleString("fr-FR")} cal` : "—"}
+              </p>
+              <p className="text-[11px] text-zinc-500 uppercase tracking-wider">MOYENNE</p>
+            </div>
+
+            <div>
+              <p className="text-lg font-bold font-mono">
+                {selectedDayKcal.toLocaleString("fr-FR")} cal
+              </p>
+              <p className="text-[11px] text-zinc-500 uppercase tracking-wider">SÉLECTION</p>
+            </div>
+
+            <div>
+              <p className="text-lg font-bold font-mono text-emerald-400">
+                {goals.targetKcal.toLocaleString("fr-FR")} cal
+              </p>
+              <p className="text-[11px] text-zinc-500 uppercase tracking-wider">OBJECTIF</p>
+            </div>
+          </div>
+
+          <section className="rounded-2xl bg-gradient-to-b from-[#1a2030] to-[#141824] border border-white/[0.07] p-4 space-y-3">
+            <BarHistoryChart
+              data={kcalSeries}
+              target={goals.targetKcal}
+              unit="kcal"
+              barColorClass="fill-emerald-500"
+            />
+          </section>
+
+          <section className="space-y-2 pt-2">
+            <h3 className="text-base font-bold">Entrées</h3>
+            {kcalEntriesAll.length === 0 ? (
+              <p className="text-xs text-zinc-500 py-6 text-center">
+                Aucune calorie enregistrée pour le moment.
+              </p>
+            ) : (
+              <div className="divide-y divide-white/[0.06]">
+                {kcalEntriesAll.slice(0, 30).map((entry) => {
+                  const delta = entry.kcal - goals.targetKcal;
                   return (
                     <div
-                      key={entry.logDate}
-                      onClick={() => {
-                        setWeightDate(entry.logDate);
-                        setWeightInput(String(entry.weightKg));
-                        setWeightModalOpen(true);
-                      }}
-                      className="cursor-pointer py-3 flex items-center justify-between gap-3 hover:bg-white/[0.02] px-1 rounded-xl transition"
+                      key={entry.date}
+                      className="py-3 flex items-center justify-between gap-3 px-1"
                     >
                       <div>
                         <p className="text-sm font-bold font-mono text-zinc-100">
-                          {entry.weightKg.toString().replace(".", ",")} kg
+                          {entry.kcal.toLocaleString("fr-FR")} cal
                         </p>
-                        <p className="text-xs text-zinc-400 capitalize">{formattedDate}</p>
+                        <p className="text-xs text-zinc-400 capitalize">
+                          {formatFullFrenchDate(entry.date)}
+                        </p>
                       </div>
-                      {onDeleteWeight && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteWeight(entry.logDate);
-                          }}
-                          className="p-2 text-zinc-500 hover:text-rose-400"
-                          title="Supprimer cette pesée"
-                        >
-                          <TrashIcon />
-                        </button>
-                      )}
+                      <span
+                        className={`text-xs font-mono font-medium ${
+                          delta <= 0 ? "text-emerald-400" : "text-amber-400"
+                        }`}
+                      >
+                        {delta > 0 ? `+${delta}` : delta} cal
+                      </span>
                     </div>
                   );
                 })}
@@ -375,84 +494,128 @@ export function AnalyticsView({
         </>
       )}
 
-      {/* VUE CALORIES */}
-      {metric === "kcal" && (
-        <section className="rounded-3xl bg-gradient-to-b from-[#1a2030] to-[#141824] border border-white/[0.07] p-4 sm:p-5 space-y-3">
-          <h3 className="font-semibold text-sm sm:text-base">Évolution des calories</h3>
-          <BarHistoryChart
-            data={kcalSeries}
-            target={goals.targetKcal}
-            unit="kcal"
-            barColorClass="fill-emerald-500"
-          />
-        </section>
-      )}
-
-      {/* VUE PAS */}
+      {/* VUE PAS (même style Mesures) */}
       {metric === "steps" && (
-        <section className="rounded-3xl bg-gradient-to-b from-[#1a2030] to-[#141824] border border-white/[0.07] p-4 sm:p-5 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <FootprintsIcon className="w-5 h-5 text-sky-400" />
-              <h3 className="font-semibold text-sm sm:text-base">Évolution des pas</h3>
+        <>
+          <div className="grid grid-cols-3 gap-2 pt-1 pb-2">
+            <div>
+              <p className="text-lg font-bold font-mono">
+                {avgSteps !== null ? avgSteps.toLocaleString("fr-FR") : "—"}
+              </p>
+              <p className="text-[11px] text-zinc-500 uppercase tracking-wider">MOYENNE</p>
             </div>
-            <div className="flex items-center gap-2">
-              <form onSubmit={handleSaveSteps} className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  value={stepsInput}
-                  onChange={(e) => setStepsInput(e.target.value)}
-                  className="w-24 rounded-xl bg-[#0f131d] border border-white/10 px-2.5 py-1.5 text-sm font-mono"
-                />
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-zinc-950 text-xs font-semibold"
-                >
-                  Enregistrer
-                </button>
-              </form>
-              <button
-                type="button"
-                onClick={() => setImportOpen((v) => !v)}
-                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium"
-              >
-                Import CSV/JSON
-              </button>
+
+            <div>
+              <p className="text-lg font-bold font-mono">
+                {selectedDaySteps.toLocaleString("fr-FR")}
+              </p>
+              <p className="text-[11px] text-zinc-500 uppercase tracking-wider">SÉLECTION</p>
+            </div>
+
+            <div>
+              <p className="text-lg font-bold font-mono text-sky-400">
+                {goals.targetSteps.toLocaleString("fr-FR")}
+              </p>
+              <p className="text-[11px] text-zinc-500 uppercase tracking-wider">OBJECTIF</p>
             </div>
           </div>
 
-          {importOpen && (
-            <div className="p-3.5 rounded-2xl bg-[#0f131d] border border-white/10 space-y-2.5">
-              <p className="text-xs text-zinc-400">
-                Colle un export CSV (<code>2026-11-15,9800</code>) ou JSON (Apple Santé / Google Takeout) :
-              </p>
-              <textarea
-                rows={3}
-                value={importText}
-                onChange={(e) => setImportText(e.target.value)}
-                placeholder={"2026-11-14,10450\n2026-11-15,9820"}
-                className="w-full rounded-xl bg-[#181d2a] border border-white/10 p-2.5 text-xs font-mono"
-              />
-              <div className="flex items-center justify-between gap-2">
+          <section className="rounded-2xl bg-gradient-to-b from-[#1a2030] to-[#141824] border border-white/[0.07] p-4 space-y-3">
+            <BarHistoryChart
+              data={stepSeries}
+              target={goals.targetSteps}
+              unit="pas"
+              barColorClass="fill-sky-500"
+            />
+          </section>
+
+          <section className="space-y-2 pt-2">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-base font-bold">Entrées</h3>
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={handleRunImport}
-                  className="px-3.5 py-1.5 rounded-xl bg-sky-500 text-zinc-950 text-xs font-semibold"
+                  onClick={() => setImportOpen((v) => !v)}
+                  className="text-xs text-zinc-400 hover:text-zinc-200"
                 >
-                  Importer les pas
+                  Import CSV/JSON
                 </button>
-                {importStatus && <span className="text-xs text-emerald-400">{importStatus}</span>}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStepsDate(selectedDate);
+                    setStepsInput(String(selectedDaySteps || 8500));
+                    setStepsModalOpen(true);
+                  }}
+                  className="text-xs text-blue-400 font-medium hover:underline"
+                >
+                  + Ajouter des pas
+                </button>
               </div>
             </div>
-          )}
 
-          <BarHistoryChart
-            data={stepSeries}
-            target={goals.targetSteps}
-            unit="pas"
-            barColorClass="fill-sky-500"
-          />
-        </section>
+            {importOpen && (
+              <div className="p-3.5 rounded-2xl bg-[#181d2a] border border-white/10 space-y-2.5">
+                <p className="text-xs text-zinc-400">
+                  Colle un export CSV (<code>2026-11-15,9800</code>) ou JSON (Apple Santé / Google Takeout) :
+                </p>
+                <textarea
+                  rows={3}
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder={"2026-11-14,10450\n2026-11-15,9820"}
+                  className="w-full rounded-xl bg-[#0f131d] border border-white/10 p-2.5 text-xs font-mono"
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRunImport}
+                    className="px-3.5 py-1.5 rounded-xl bg-sky-500 text-zinc-950 text-xs font-semibold"
+                  >
+                    Importer les pas
+                  </button>
+                  {importStatus && <span className="text-xs text-emerald-400">{importStatus}</span>}
+                </div>
+              </div>
+            )}
+
+            {sortedStepsDesc.length === 0 ? (
+              <p className="text-xs text-zinc-500 py-6 text-center">
+                Aucun pas enregistré. Clique sur + en haut à droite pour ajouter une journée.
+              </p>
+            ) : (
+              <div className="divide-y divide-white/[0.06]">
+                {sortedStepsDesc.map((entry) => (
+                  <div
+                    key={entry.logDate}
+                    onClick={() => {
+                      setStepsDate(entry.logDate);
+                      setStepsInput(String(entry.steps));
+                      setStepsModalOpen(true);
+                    }}
+                    className="cursor-pointer py-3 flex items-center justify-between gap-3 hover:bg-white/[0.02] px-1 rounded-xl transition"
+                  >
+                    <div>
+                      <p className="text-sm font-bold font-mono text-zinc-100">
+                        {entry.steps.toLocaleString("fr-FR")} pas
+                      </p>
+                      <p className="text-xs text-zinc-400 capitalize">
+                        {formatFullFrenchDate(entry.logDate)}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-xs font-mono ${
+                        entry.steps >= goals.targetSteps ? "text-emerald-400" : "text-zinc-500"
+                      }`}
+                    >
+                      {Math.round((entry.steps / Math.max(1, goals.targetSteps)) * 100)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
       )}
 
       {/* Modal Ajout / Modification de pesée */}
@@ -496,6 +659,61 @@ export function AnalyticsView({
                   value={weightInput}
                   onChange={(e) => setWeightInput(e.target.value)}
                   className="w-full rounded-xl bg-[#0f131d] border border-white/10 px-3 py-2 font-mono text-emerald-400 font-bold"
+                />
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-2.5 rounded-xl bg-gradient-to-b from-blue-400 to-blue-600 text-white font-semibold text-sm shadow-lg"
+            >
+              Enregistrer
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Modal Ajout / Modification de pas */}
+      {stepsModalOpen && (
+        <div
+          onClick={() => setStepsModalOpen(false)}
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+        >
+          <form
+            onSubmit={handleSaveSteps}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl bg-[#181d2a] border border-white/10 p-5 space-y-4 shadow-2xl"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold">Enregistrer des pas</h3>
+              <button
+                type="button"
+                onClick={() => setStepsModalOpen(false)}
+                className="p-1.5 rounded-full bg-white/5 text-zinc-400 hover:text-zinc-200"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <label className="space-y-1">
+                <span className="text-zinc-400">Date</span>
+                <input
+                  type="date"
+                  value={stepsDate}
+                  onChange={(e) => setStepsDate(e.target.value)}
+                  className="w-full rounded-xl bg-[#0f131d] border border-white/10 px-3 py-2 font-mono text-zinc-100"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-zinc-400">Nombre de pas</span>
+                <input
+                  type="number"
+                  min={0}
+                  required
+                  value={stepsInput}
+                  onChange={(e) => setStepsInput(e.target.value)}
+                  className="w-full rounded-xl bg-[#0f131d] border border-white/10 px-3 py-2 font-mono text-sky-400 font-bold"
                 />
               </label>
             </div>

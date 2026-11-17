@@ -170,6 +170,9 @@ export function MacroPulseApp() {
 
   const streakCount = useMemo(() => {
     if (!hydrated || loggedDatesSet.size === 0) return 0;
+    const toLocalISO = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
     const today = todayISO();
     let count = 0;
     const cursor = new Date(`${today}T12:00:00`);
@@ -177,7 +180,7 @@ export function MacroPulseApp() {
     if (!loggedDatesSet.has(today)) {
       cursor.setDate(cursor.getDate() - 1);
     }
-    while (loggedDatesSet.has(cursor.toISOString().slice(0, 10))) {
+    while (loggedDatesSet.has(toLocalISO(cursor))) {
       count += 1;
       cursor.setDate(cursor.getDate() - 1);
     }

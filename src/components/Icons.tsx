@@ -145,7 +145,7 @@ export function UserIcon({ className = "w-5 h-5" }: IconProps) {
 export function FlameIcon({ className = "w-5 h-5" }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12.7 2.3a1 1 0 0 0-1.4 0C8.5 5.1 7 8 7 11a5 5 0 0 0 10 0c0-1.7-.6-3.3-1.6-4.7-.4-.5-1.2-.5-1.5.1-.4.7-.9 1.2-1.5 1.5.5-1.6.7-3.5.3-5.6ZM12 20a6 6 0 0 1-6-6c0-2.6 1.2-5 3.4-7.4-.2 1.4.2 2.9 1.2 4 .5.5 1.3.4 1.6-.2.4-.7 1-1.3 1.7-1.6A6.5 6.5 0 0 1 18 14a6 6 0 0 1-6 6Z" />
+      <path d="M12.6 2.2c.2 2.4-.5 4.2-1.8 5.6-.4-.9-.5-1.8-.3-2.9C7.6 7.1 6 10 6 13.2a6 6 0 0 0 12 0c0-4.1-2.2-7.5-5.4-11Z" />
     </svg>
   );
 }
