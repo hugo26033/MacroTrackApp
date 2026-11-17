@@ -451,14 +451,26 @@ export function QuickAddModal({
           mimeType: photoMime,
         }),
       });
-      const data = await res.json();
+      const rawBody = await res.text();
+      let data: { error?: string; items?: GeminiDetectedFood[] } = {};
+      try {
+        data = JSON.parse(rawBody);
+      } catch {
+        // Réponse non-JSON (ex: 504 Timeout Vercel)
+      }
       if (!res.ok) {
-        setAiError(data.error || "Erreur Gemini.");
+        setAiError(
+          data.error || `Erreur serveur (${res.status}). Réessaie ou précise le texte.`
+        );
       } else {
         setAiItems(data.items ?? []);
       }
-    } catch {
-      setAiError("Impossible de contacter l'API Gemini.");
+    } catch (err) {
+      setAiError(
+        err instanceof Error
+          ? `Erreur réseau : ${err.message}`
+          : "Impossible de contacter l'API Gemini."
+      );
     } finally {
       setAiLoading(false);
     }

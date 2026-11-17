@@ -30,7 +30,7 @@ function cleanJsonText(raw: string): string {
 export async function callGeminiJSON<T>({
   parts,
   temperature = 0.2,
-  timeoutMs = 18000,
+  timeoutMs = 6500,
 }: CallGeminiOptions): Promise<T> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
