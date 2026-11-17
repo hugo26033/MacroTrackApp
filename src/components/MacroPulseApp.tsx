@@ -51,6 +51,7 @@ import {
 import { QuickAddModal, QuickAddTabMode } from "./QuickAddModal";
 import { ProfileMenuModal } from "./ProfileMenuModal";
 import { FoodLogDetailModal } from "./FoodLogDetailModal";
+import { MacroOptimizerModal } from "./MacroOptimizerModal";
 
 type ActiveTab = "today" | "analytics" | "goals";
 
@@ -98,6 +99,7 @@ export function MacroPulseApp() {
   // Modals & UI toggles
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<FoodLogEntry | null>(null);
+  const [optimizerOpen, setOptimizerOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState<string>("");
   const [showMicronutrients, setShowMicronutrients] = useState(false);
@@ -1088,6 +1090,17 @@ export function MacroPulseApp() {
             <div className="rounded-2xl bg-[#252b3d] divide-y divide-white/[0.06] overflow-hidden">
               <button
                 type="button"
+                onClick={() => {
+                  setAddSheetOpen(false);
+                  setOptimizerOpen(true);
+                }}
+                className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-100 hover:bg-white/[0.04] transition"
+              >
+                <SparklesIcon className="w-4 h-4 text-blue-400" />
+                <span>Compléter / Planifier macros (Auto)</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => openQuickAdd("photo", "lunch")}
                 className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-100 hover:bg-white/[0.04] transition"
               >
@@ -1184,6 +1197,17 @@ export function MacroPulseApp() {
         onClose={() => setEditingEntry(null)}
         onSave={handleUpdateFoodLog}
         onDelete={handleDeleteFoodLog}
+      />
+
+      <MacroOptimizerModal
+        open={optimizerOpen}
+        onClose={() => setOptimizerOpen(false)}
+        selectedDate={selectedDate}
+        goals={state.goals}
+        dayTotals={dayTotals}
+        foods={state.foods}
+        recipes={state.recipes}
+        onApplyLogs={handleAddFoodLogs}
       />
     </div>
   );
