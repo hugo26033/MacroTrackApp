@@ -10,6 +10,7 @@ interface CallGeminiOptions {
   parts: GeminiPart[];
   temperature?: number;
   timeoutMs?: number;
+  thinkingLevel?: "minimal" | "low" | "medium" | "high";
 }
 
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
@@ -77,7 +78,8 @@ async function trySingleModel<T>(
   model: string,
   parts: GeminiPart[],
   temperature: number,
-  timeoutMs: number
+  timeoutMs: number,
+  thinkingLevel: "minimal" | "low" | "medium" | "high"
 ): Promise<{ ok: true; data: T } | { ok: false; status: number; error: string }> {
   try {
     const res = await fetch(
@@ -92,6 +94,9 @@ async function trySingleModel<T>(
           generationConfig: {
             temperature,
             responseMimeType: "application/json",
+            thinkingConfig: {
+              thinkingLevel,
+            },
           },
         }),
         signal: AbortSignal.timeout(timeoutMs),
@@ -126,6 +131,7 @@ export async function callGeminiJSON<T>({
   parts,
   temperature = 0.2,
   timeoutMs = 6500,
+  thinkingLevel = "low",
 }: CallGeminiOptions): Promise<T> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -144,7 +150,7 @@ export async function callGeminiJSON<T>({
 
   for (const model of staticModels) {
     tried.add(model);
-    const result = await trySingleModel<T>(apiKey, model, parts, temperature, timeoutMs);
+    const result = await trySingleModel<T>(apiKey, model, parts, temperature, timeoutMs, thinkingLevel);
     if (result.ok) return result.data;
     lastError = result.error;
 
@@ -158,7 +164,7 @@ export async function callGeminiJSON<T>({
   for (const model of discovered.slice(0, 4)) {
     if (tried.has(model)) continue;
     tried.add(model);
-    const result = await trySingleModel<T>(apiKey, model, parts, temperature, timeoutMs);
+    const result = await trySingleModel<T>(apiKey, model, parts, temperature, timeoutMs, thinkingLevel);
     if (result.ok) return result.data;
     lastError = result.error;
   }
