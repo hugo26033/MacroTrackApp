@@ -177,6 +177,15 @@ export function QuickAddModal({
       setSelectedRecipe(null);
     } else {
       stopCamera();
+      setPhotoPreview(null);
+      setBarcodePhotoPreview(null);
+      setBarcodeInput("");
+      setBarcodeError(null);
+      setBarcodeSavedMsg(null);
+      setFoundProduct(null);
+      setAiItems([]);
+      setAiError(null);
+      setAiText("");
     }
     return () => stopCamera();
   }, [open, initialTab, initialMealSlot]);
@@ -2083,10 +2092,44 @@ export function QuickAddModal({
               </div>
             )}
 
-            {aiItems.length > 0 && (
+            {aiItems.length > 0 && (() => {
+              const totalKcal = Math.round(aiItems.reduce((s, i) => s + (i.kcal || 0), 0));
+              const totalP = Math.round(aiItems.reduce((s, i) => s + (i.proteinG || 0), 0) * 10) / 10;
+              const totalC = Math.round(aiItems.reduce((s, i) => s + (i.carbsG || 0), 0) * 10) / 10;
+              const totalF = Math.round(aiItems.reduce((s, i) => s + (i.fatG || 0), 0) * 10) / 10;
+              return (
               <div className="space-y-3">
+                <div className="rounded-2xl bg-[#0f131d] border border-white/[0.08] p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-zinc-200">
+                      Total du repas ({aiItems.length} élément{aiItems.length > 1 ? "s" : ""})
+                    </span>
+                    <span className="font-mono font-bold text-emerald-400">
+                      {totalKcal} kcal
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                    <div className="rounded-xl bg-[#181d2a] py-1.5">
+                      <div className="text-[10px] text-zinc-400">Kcal</div>
+                      <div className="font-mono font-bold text-blue-400">{totalKcal}</div>
+                    </div>
+                    <div className="rounded-xl bg-[#181d2a] py-1.5">
+                      <div className="text-[10px] text-zinc-400">Gluc</div>
+                      <div className="font-mono font-bold text-teal-400">{totalC} g</div>
+                    </div>
+                    <div className="rounded-xl bg-[#181d2a] py-1.5">
+                      <div className="text-[10px] text-zinc-400">Lip</div>
+                      <div className="font-mono font-bold text-purple-400">{totalF} g</div>
+                    </div>
+                    <div className="rounded-xl bg-[#181d2a] py-1.5">
+                      <div className="text-[10px] text-zinc-400">Prot</div>
+                      <div className="font-mono font-bold text-amber-400">{totalP} g</div>
+                    </div>
+                  </div>
+                </div>
+
                 <p className="text-xs font-medium text-zinc-400">
-                  Aperçu éditable avant validation ({aiItems.length} élément{aiItems.length > 1 ? "s" : ""}) :
+                  Détail éditable avant validation :
                 </p>
                 {aiItems.map((item, idx) => (
                   <div
@@ -2172,7 +2215,8 @@ export function QuickAddModal({
                   Valider et ajouter au journal
                 </button>
               </div>
-            )}
+              );
+            })()}
           </div>
         )}
 
