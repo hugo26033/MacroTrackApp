@@ -37,10 +37,10 @@ export async function callGeminiJSON<T>({
     throw new Error("Clé GEMINI_API_KEY manquante côté serveur.");
   }
 
-  const primary = process.env.GEMINI_MODEL?.trim() || "gemini-4-hydrogen";
-  const models = Array.from(
-    new Set([primary, "gemini-3.8-flash", "gemini-2.5-flash"])
-  );
+  const envModel = process.env.GEMINI_MODEL?.trim();
+  const primary =
+    envModel && envModel !== "gemini-2.5-flash" ? envModel : "gemini-4-hydrogen";
+  const models = Array.from(new Set([primary, "gemini-3.8-flash"]));
 
   let lastError = "Erreur API Gemini.";
 
