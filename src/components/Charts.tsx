@@ -28,7 +28,13 @@ function makeSmoothPath(coords: Array<{ x: number; y: number } | null>): string 
   return d;
 }
 
-export function WeightTrendChart({ data }: { data: WeightPointWithTrends[] }) {
+export function WeightTrendChart({
+  data,
+  prevDayKcalByDate,
+}: {
+  data: WeightPointWithTrends[];
+  prevDayKcalByDate?: Record<string, number>;
+}) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const gradId = useId();
 
@@ -114,6 +120,15 @@ export function WeightTrendChart({ data }: { data: WeightPointWithTrends[] }) {
             {activePoint.logDate.slice(5)} · Brut <strong>{activePoint.weightKg}</strong> · 3j{" "}
             <strong className="text-emerald-400">{activePoint.ma3 ?? "-"}</strong> · 5j{" "}
             <strong className="text-sky-400">{activePoint.ma5 ?? "-"}</strong>
+            {prevDayKcalByDate && prevDayKcalByDate[activePoint.logDate] !== undefined && (
+              <>
+                {" "}
+                · Veille{" "}
+                <strong className="text-amber-300">
+                  {prevDayKcalByDate[activePoint.logDate].toLocaleString("fr-FR")} cal
+                </strong>
+              </>
+            )}
           </div>
         )}
       </div>

@@ -27,6 +27,12 @@ export function todayISO(): string {
   return `${y}-${m}-${d}`;
 }
 
+export function prevDateISO(isoDate: string): string {
+  const d = new Date(`${isoDate}T12:00:00`);
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function scaleNutrients(per100g: NutrientValues, quantityG: number): NutrientValues {
   const factor = quantityG / 100;
   const micronutrients: NutrientValues["micronutrients"] = {};
@@ -210,9 +216,12 @@ export function calculateTdee(params: {
       Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000)
     );
 
+    const kcalStart = prevDateISO(startDate);
+    const kcalEnd = prevDateISO(endDate);
+
     const kcalByDate = new Map<string, number>();
     for (const log of foodLogs) {
-      if (log.logDate >= startDate && log.logDate <= endDate) {
+      if (log.logDate >= kcalStart && log.logDate <= kcalEnd) {
         kcalByDate.set(log.logDate, (kcalByDate.get(log.logDate) ?? 0) + log.nutrients.kcal);
       }
     }

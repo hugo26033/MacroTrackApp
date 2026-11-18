@@ -6,6 +6,7 @@ import {
   analyzeWeightTrends,
   computeWeightSeriesWithTrends,
   parseStepsImportText,
+  prevDateISO,
 } from "@/lib/calculations";
 import type {
   ChartRange,
@@ -129,6 +130,15 @@ export function AnalyticsView({
     kcalEntriesAll.map((e) => ({ date: e.date, value: e.kcal })),
     range
   );
+
+  // Associer chaque pesée (matin à jeun) aux calories consommées la veille
+  const prevDayKcalByWeightDate: Record<string, number> = {};
+  for (const w of weights) {
+    const prevKcal = kcalByDate.get(prevDateISO(w.logDate));
+    if (prevKcal !== undefined) {
+      prevDayKcalByWeightDate[w.logDate] = prevKcal;
+    }
+  }
   const avgKcal =
     kcalSeries.length > 0
       ? Math.round(kcalSeries.reduce((s, d) => s + d.value, 0) / kcalSeries.length)
@@ -184,8 +194,11 @@ export function AnalyticsView({
     if (metric === "weight") {
       const rows = [...weights]
         .sort((a, b) => a.logDate.localeCompare(b.logDate))
-        .map((w) => `${w.logDate},${w.weightKg}`);
-      csv = ["date,poids_kg", ...rows].join("\n");
+        .map((w) => {
+          const prevKcal = prevDayKcalByWeightDate[w.logDate];
+          return `${w.logDate},${w.weightKg},${prevKcal ?? ""}`;
+        });
+      csv = ["date,poids_kg,kcal_veille", ...rows].join("\n");
     } else if (metric === "kcal") {
       filename = "macropulse-calories.csv";
       const rows = [...kcalEntriesAll]
@@ -323,7 +336,10 @@ export function AnalyticsView({
           </div>
 
           <section className="rounded-2xl bg-gradient-to-b from-[#1a2030] to-[#141824] border border-white/[0.07] p-4 space-y-4">
-            <WeightTrendChart data={visibleWeightSeries} />
+            <WeightTrendChart
+              data={visibleWeightSeries}
+              prevDayKcalByDate={prevDayKcalByWeightDate}
+            />
 
             <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-white/[0.06]">
               <div className="flex items-center justify-between text-xs">
@@ -381,7 +397,9 @@ export function AnalyticsView({
               </p>
             ) : (
               <div className="divide-y divide-white/[0.06]">
-                {sortedWeightsDesc.map((entry) => (
+                {sortedWeightsDesc.map((entry) => {
+                  const prevKcal = prevDayKcalByWeightDate[entry.logDate];
+                  return (
                   <div
                     key={entry.logDate}
                     onClick={() => {
@@ -392,9 +410,16 @@ export function AnalyticsView({
                     className="cursor-pointer py-3 flex items-center justify-between gap-3 hover:bg-white/[0.02] px-1 rounded-xl transition"
                   >
                     <div>
-                      <p className="text-sm font-bold font-mono text-zinc-100">
-                        {entry.weightKg.toString().replace(".", ",")} kg
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold font-mono text-zinc-100">
+                          {entry.weightKg.toString().replace(".", ",")} kg
+                        </p>
+                        {prevKcal !== undefined && (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[11px] font-mono text-amber-300">
+                            Veille : {prevKcal.toLocaleString("fr-FR")} cal
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-zinc-400 capitalize">
                         {formatFullFrenchDate(entry.logDate)}
                       </p>
@@ -413,7 +438,8 @@ export function AnalyticsView({
                       </button>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
