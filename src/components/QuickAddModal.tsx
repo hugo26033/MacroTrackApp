@@ -39,6 +39,7 @@ interface QuickAddModalProps {
   initialMealSlot?: MealSlot;
   onAddFoodLogs: (logs: Omit<FoodLogEntry, "id">[]) => void;
   onSaveCustomFood: (food: FoodItem) => void;
+  onUpdateCustomFood?: (food: FoodItem) => void;
   onSaveRecipe?: (recipe: Recipe) => void;
   onDeleteRecipe?: (id: string) => void;
 }
@@ -61,6 +62,7 @@ export function QuickAddModal({
   initialMealSlot = "lunch",
   onAddFoodLogs,
   onSaveCustomFood,
+  onUpdateCustomFood,
   onSaveRecipe,
   onDeleteRecipe,
 }: QuickAddModalProps) {
@@ -1527,10 +1529,34 @@ export function QuickAddModal({
                     >
                       ← Retour aux résultats
                     </button>
-                    <h3 className="text-base font-semibold text-zinc-100">{selectedFood.name}</h3>
-                    {selectedFood.brand && (
-                      <p className="text-xs text-zinc-400">{selectedFood.brand}</p>
-                    )}
+                    <input
+                      type="text"
+                      value={selectedFood.name}
+                      onChange={(e) => {
+                        const updated = { ...selectedFood, name: e.target.value };
+                        setSelectedFood(updated);
+                        if (e.target.value.trim()) {
+                          onUpdateCustomFood?.(updated);
+                        }
+                      }}
+                      className="w-full bg-transparent text-base font-semibold text-zinc-100 border-b border-white/10 focus:border-blue-500 focus:outline-none pb-0.5"
+                      aria-label="Nom de l'aliment"
+                    />
+                    <input
+                      type="text"
+                      value={selectedFood.brand ?? ""}
+                      placeholder="Marque (optionnelle)"
+                      onChange={(e) => {
+                        const updated = {
+                          ...selectedFood,
+                          brand: e.target.value || undefined,
+                        };
+                        setSelectedFood(updated);
+                        onUpdateCustomFood?.(updated);
+                      }}
+                      className="w-full bg-transparent text-xs text-zinc-400 border-b border-transparent focus:border-white/15 focus:outline-none mt-1"
+                      aria-label="Marque de l'aliment"
+                    />
                   </div>
                   <span className="shrink-0 text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full">
                     {selectedFood.per100g.kcal} kcal / 100g
@@ -1940,11 +1966,29 @@ export function QuickAddModal({
             {foundProduct && (
               <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-3">
                 <div className="flex justify-between items-start gap-2">
-                  <div>
-                    <p className="font-semibold text-sm">{foundProduct.name}</p>
-                    {foundProduct.brand && (
-                      <p className="text-xs text-zinc-400">{foundProduct.brand}</p>
-                    )}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <input
+                      type="text"
+                      value={foundProduct.name}
+                      onChange={(e) =>
+                        setFoundProduct({ ...foundProduct, name: e.target.value })
+                      }
+                      className="w-full bg-transparent font-semibold text-sm text-zinc-100 border-b border-white/10 focus:border-emerald-500 focus:outline-none pb-0.5"
+                      aria-label="Nom du produit"
+                    />
+                    <input
+                      type="text"
+                      value={foundProduct.brand ?? ""}
+                      placeholder="Marque (optionnelle)"
+                      onChange={(e) =>
+                        setFoundProduct({
+                          ...foundProduct,
+                          brand: e.target.value || undefined,
+                        })
+                      }
+                      className="w-full bg-transparent text-xs text-zinc-400 border-b border-transparent focus:border-white/15 focus:outline-none"
+                      aria-label="Marque du produit"
+                    />
                   </div>
                   <span className="text-xs font-mono text-emerald-400">
                     {foundProduct.per100g.kcal} kcal / 100g

@@ -35,6 +35,7 @@ export function FoodLogDetailModal({
   onSave,
   onDelete,
 }: FoodLogDetailModalProps) {
+  const [foodName, setFoodName] = useState<string>("");
   const [quantityG, setQuantityG] = useState<number>(100);
   const [mealSlot, setMealSlot] = useState<MealSlot>("lunch");
   const [timeHHMM, setTimeHHMM] = useState<string>("12:00");
@@ -65,6 +66,7 @@ export function FoodLogDetailModal({
       fatG: entry.nutrients.fatG * factor,
       micronutrients: microsPer100,
     });
+    setFoodName(entry.foodName);
     setQuantityG(entry.quantityG);
     setMealSlot(entry.mealSlot);
     setTimeHHMM(entry.loggedAt.slice(11, 16) || "12:00");
@@ -133,6 +135,7 @@ export function FoodLogDetailModal({
     const updatedLoggedAt = `${entry.logDate}T${timeHHMM}:00`;
     onSave({
       ...entry,
+      foodName: foodName.trim() || entry.foodName,
       quantityG,
       ...(recipeItems ? { recipeItems } : {}),
       mealSlot,
@@ -159,9 +162,15 @@ export function FoodLogDetailModal({
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-lg font-bold leading-snug">{entry.foodName}</h2>
-            {entry.brand && <p className="text-xs text-zinc-400">{entry.brand}</p>}
+          <div className="min-w-0 flex-1">
+            <input
+              type="text"
+              value={foodName}
+              onChange={(e) => setFoodName(e.target.value)}
+              className="w-full bg-transparent text-lg font-bold leading-snug border-b border-white/10 focus:border-blue-500 focus:outline-none pb-0.5"
+              aria-label="Nom de l'aliment"
+            />
+            {entry.brand && <p className="text-xs text-zinc-400 mt-1">{entry.brand}</p>}
           </div>
           <button
             type="button"

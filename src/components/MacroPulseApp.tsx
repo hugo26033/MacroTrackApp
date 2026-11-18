@@ -237,6 +237,13 @@ export function MacroPulseApp() {
     });
   }
 
+  function handleUpdateCustomFood(updated: FoodItem) {
+    setState((prev) => ({
+      ...prev,
+      foods: prev.foods.map((f) => (f.id === updated.id ? updated : f)),
+    }));
+  }
+
   function handleSaveRecipe(recipe: Recipe) {
     setState((prev) => {
       const exists = prev.recipes.some((r) => r.id === recipe.id);
@@ -1145,6 +1152,7 @@ export function MacroPulseApp() {
         initialMealSlot={quickAddSlot}
         onAddFoodLogs={handleAddFoodLogs}
         onSaveCustomFood={handleSaveCustomFood}
+        onUpdateCustomFood={handleUpdateCustomFood}
         onSaveRecipe={handleSaveRecipe}
         onDeleteRecipe={handleDeleteRecipe}
       />
