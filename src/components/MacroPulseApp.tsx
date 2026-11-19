@@ -539,7 +539,7 @@ function MacroPulseClientApp() {
                   <button
                     type="button"
                     onClick={() => shiftCalMonth(-1)}
-                    className="min-w-11 min-h-11 px-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium flex items-center justify-center"
+                    className="min-w-11 min-h-11 px-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-white/5 dark:hover:bg-white/10 text-xs font-medium flex items-center justify-center"
                     aria-label="Mois précédent"
                   >
                     ←
@@ -553,7 +553,7 @@ function MacroPulseClientApp() {
                         setCalendarMonth(todayStr.slice(0, 7));
                         setDatePickerOpen(false);
                       }}
-                      className="min-h-11 px-3 rounded-xl bg-blue-500/15 text-blue-400 text-xs font-medium flex items-center justify-center"
+                      className="min-h-11 px-3 rounded-xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 text-xs font-medium flex items-center justify-center"
                     >
                       Aujourd&apos;hui
                     </button>
@@ -791,7 +791,7 @@ function MacroPulseClientApp() {
                 <button
                   type="button"
                   onClick={() => setShowFullJournal((v) => !v)}
-                  className="min-h-11 px-2 inline-flex items-center text-sm font-semibold text-blue-400 hover:text-blue-300"
+                  className="min-h-11 px-2 inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300"
                 >
                   {showFullJournal ? "Vue résumée" : "Voir le journal"}
                 </button>
@@ -813,7 +813,7 @@ function MacroPulseClientApp() {
                             onClick={() =>
                               setExpandedMeals((prev) => ({ ...prev, [slot]: !prev[slot] }))
                             }
-                            className="min-w-11 min-h-11 flex items-center justify-center text-zinc-400 hover:text-zinc-200 text-sm tracking-widest rounded-full"
+                            className="min-w-11 min-h-11 flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 text-sm tracking-widest rounded-full"
                             title="Afficher / masquer le détail"
                             aria-label={`Afficher ou masquer le détail de ${label}`}
                           >
@@ -822,7 +822,7 @@ function MacroPulseClientApp() {
                           <button
                             type="button"
                             onClick={() => openQuickAdd("all", slot)}
-                            className="min-h-11 px-4 rounded-full bg-blue-500/15 hover:bg-blue-500/25 border border-blue-400/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] text-blue-400 text-xs font-semibold transition active:scale-[0.96]"
+                            className="min-h-11 px-4 rounded-full bg-blue-500/10 hover:bg-blue-500/20 dark:bg-blue-500/15 dark:hover:bg-blue-500/25 border border-blue-500/25 dark:border-blue-400/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] text-blue-600 dark:text-blue-400 text-xs font-semibold transition active:scale-[0.96]"
                           >
                             Consignez
                           </button>
@@ -830,12 +830,12 @@ function MacroPulseClientApp() {
                       </div>
 
                       {items.length === 0 ? (
-                        <div className="flex items-center justify-between pt-1 border-t border-white/[0.05]">
-                          <p className="text-xs text-zinc-400">Aucun aliment consigné</p>
+                        <div className="flex items-center justify-between pt-1 border-t border-zinc-200/80 dark:border-white/[0.05]">
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400">Aucun aliment consigné</p>
                           <button
                             type="button"
                             onClick={() => handleDuplicateYesterday(slot)}
-                            className="min-h-11 px-2 inline-flex items-center gap-1 text-xs text-blue-400 hover:underline"
+                            className="min-h-11 px-2 inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
                           >
                             <CopyIcon className="w-3.5 h-3.5" /> Copier hier
                           </button>
@@ -849,25 +849,25 @@ function MacroPulseClientApp() {
                               setExpandedMeals((prev) => ({ ...prev, [slot]: true }));
                             }
                           }}
-                          className="cursor-pointer pt-1 text-xs text-zinc-400 space-y-0.5 hover:text-zinc-200 transition"
+                          className="cursor-pointer pt-1 text-xs text-zinc-500 dark:text-zinc-400 space-y-0.5 hover:text-zinc-900 dark:hover:text-zinc-200 transition"
                         >
-                          <p className="text-zinc-300 truncate">
+                          <p className="text-zinc-700 dark:text-zinc-300 truncate">
                             {items[0].foodName}
                             {items.length > 1 ? ` et ${items.length - 1} de plus` : ""}
                           </p>
                           <p>{slotKcal.toLocaleString("fr-FR")} cal</p>
                         </div>
                       ) : (
-                        <div className="divide-y divide-white/[0.06] pt-1 border-t border-white/[0.05]">
+                        <div className="divide-y divide-zinc-200/80 dark:divide-white/[0.06] pt-1 border-t border-zinc-200/80 dark:border-white/[0.05]">
                           {items.map((item) => (
                             <div
                               key={item.id}
                               onClick={() => setEditingEntry(item)}
-                              className="cursor-pointer py-2 px-2 -mx-2 rounded-xl hover:bg-white/[0.04] flex items-center justify-between gap-2 text-xs transition"
+                              className="cursor-pointer py-2 px-2 -mx-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-white/[0.04] flex items-center justify-between gap-2 text-xs transition"
                             >
                               <div className="min-w-0">
-                                <p className="font-medium text-zinc-200 truncate">{item.foodName}</p>
-                                <p className="text-[11px] text-zinc-400">
+                                <p className="font-medium text-zinc-900 dark:text-zinc-200 truncate">{item.foodName}</p>
+                                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
                                   {item.unitQuantity
                                     ? `${formatFrNumber(item.unitQuantity)} ${item.unitLabel || "unité"} (${formatFrNumber(item.quantityG)} g)`
                                     : `${formatFrNumber(item.quantityG)} g`}{" "}
@@ -876,7 +876,7 @@ function MacroPulseClientApp() {
                                 </p>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
-                                <span className="font-mono text-blue-400 font-semibold">
+                                <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold">
                                   {item.nutrients.kcal.toLocaleString("fr-FR")} cal
                                 </span>
                                 <button
@@ -885,7 +885,7 @@ function MacroPulseClientApp() {
                                     e.stopPropagation();
                                     handleDeleteFoodLog(item.id);
                                   }}
-                                  className="min-w-11 min-h-11 flex items-center justify-center text-zinc-500 hover:text-rose-400 rounded-full"
+                                  className="min-w-11 min-h-11 flex items-center justify-center text-zinc-400 dark:text-zinc-500 hover:text-rose-500 dark:hover:text-rose-400 rounded-full"
                                   title="Supprimer"
                                   aria-label={`Supprimer ${item.foodName}`}
                                 >
@@ -905,15 +905,15 @@ function MacroPulseClientApp() {
                 <button
                   type="button"
                   onClick={() => setShowFullJournal((v) => !v)}
-                  className="min-h-11 px-2 inline-flex items-center text-sm font-semibold text-blue-400 hover:text-blue-300"
+                  className="min-h-11 px-2 inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300"
                 >
                   {showFullJournal ? "Réduire le journal" : "Journal complet"}
                 </button>
-                <span className="text-zinc-600">•</span>
+                <span className="text-zinc-400 dark:text-zinc-600">•</span>
                 <button
                   type="button"
                   onClick={() => handleDuplicateYesterday()}
-                  className="min-h-11 px-2 inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200"
+                  className="min-h-11 px-2 inline-flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
                 >
                   <CopyIcon className="w-3.5 h-3.5" /> Dupliquer hier
                 </button>
@@ -923,12 +923,12 @@ function MacroPulseClientApp() {
             {/* Habitudes saines */}
             <section className="space-y-2.5">
               <h2 className="text-lg font-bold">Habitudes saines</h2>
-              <div className={`rounded-2xl border divide-y divide-white/[0.06] ${cardSurface}`}>
+              <div className={`rounded-2xl border divide-y divide-zinc-200/80 dark:divide-white/[0.06] ${cardSurface}`}>
                 {/* Eau */}
                 <div className="p-4 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold">Eau</p>
-                    <p className="text-xs text-zinc-400 mt-0.5">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                       {dayWaterMl.toLocaleString("fr-FR")} ml / {state.goals.targetWaterMl.toLocaleString("fr-FR")} ml
                     </p>
                   </div>
@@ -938,7 +938,7 @@ function MacroPulseClientApp() {
                         key={ml}
                         type="button"
                         onClick={() => handleAddWater(ml)}
-                        className="min-h-11 px-3.5 rounded-full bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 text-xs font-semibold"
+                        className="min-h-11 px-3.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 dark:bg-blue-500/15 dark:hover:bg-blue-500/25 text-blue-600 dark:text-blue-400 text-xs font-semibold"
                       >
                         +{ml} ml
                       </button>
@@ -954,7 +954,7 @@ function MacroPulseClientApp() {
                     className="min-h-11 text-left flex-1 flex flex-col justify-center"
                   >
                     <p className="text-sm font-semibold">Pas</p>
-                    <p className="text-xs text-zinc-400 mt-0.5">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                       {daySteps.toLocaleString("fr-FR")} pas aujourd&apos;hui
                     </p>
                   </button>
@@ -962,14 +962,14 @@ function MacroPulseClientApp() {
                     <button
                       type="button"
                       onClick={() => handleLogSteps(selectedDate, daySteps + 1000)}
-                      className="min-h-11 px-3.5 rounded-full bg-white/5 hover:bg-white/10 text-xs font-medium text-zinc-300"
+                      className="min-h-11 px-3.5 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-white/5 dark:hover:bg-white/10 text-xs font-medium text-zinc-700 dark:text-zinc-300"
                     >
                       +1 000
                     </button>
                     <button
                       type="button"
                       onClick={() => setActiveTab("analytics")}
-                      className="min-w-11 min-h-11 flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-full"
+                      className="min-w-11 min-h-11 flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 rounded-full"
                       aria-label="Voir les pas"
                     >
                       <ChevronRightIcon className="w-4 h-4" />
@@ -985,16 +985,16 @@ function MacroPulseClientApp() {
               <button
                 type="button"
                 onClick={() => setActiveTab("analytics")}
-                className={`w-full rounded-2xl border p-4 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02] transition ${cardSurface}`}
+                className={`w-full rounded-2xl border p-4 flex items-center justify-between gap-3 text-left hover:bg-zinc-50 dark:hover:bg-white/[0.02] transition ${cardSurface}`}
               >
                 <div>
                   <p className="text-xl font-bold">
                     {weightTrends.latestWeight ? `${formatFrNumber(weightTrends.latestWeight)} kg` : "—"}
                   </p>
-                  <p className="text-xs text-zinc-400 mt-0.5">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                     3j : {weightTrends.ma3Latest !== null ? formatFrNumber(weightTrends.ma3Latest) : "—"} · 5j :{" "}
                     {weightTrends.ma5Latest !== null ? formatFrNumber(weightTrends.ma5Latest) : "—"} ·{" "}
-                    <span className="capitalize text-blue-400">{weightTrends.status3}</span>
+                    <span className="capitalize text-blue-600 dark:text-blue-400">{weightTrends.status3}</span>
                   </p>
                 </div>
                 <ChevronRightIcon className="w-4 h-4 text-zinc-400 shrink-0" />
@@ -1010,7 +1010,7 @@ function MacroPulseClientApp() {
                   value={dailyNote}
                   onChange={(e) => handleUpdateNote(e.target.value)}
                   placeholder="Ajouter une remarque"
-                  className="flex-1 bg-transparent text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
+                  className="flex-1 bg-transparent text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none"
                 />
                 <PencilIcon className="w-4 h-4 text-zinc-400 shrink-0" />
               </div>
@@ -1127,7 +1127,7 @@ function MacroPulseClientApp() {
                   ? isDark
                     ? "bg-[#282f42] text-white"
                     : "bg-zinc-900 text-white"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
               }`}
             >
               <HomeIcon className="w-5 h-5" />
@@ -1142,7 +1142,7 @@ function MacroPulseClientApp() {
                   ? isDark
                     ? "bg-[#282f42] text-white"
                     : "bg-zinc-900 text-white"
-                  : "text-zinc-400 hover:text-zinc-200"
+                  : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
               }`}
             >
               <ChartIcon className="w-5 h-5" />
@@ -1165,18 +1165,18 @@ function MacroPulseClientApp() {
       {addSheetOpen && (
         <div
           onClick={() => setAddSheetOpen(false)}
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+          className="fixed inset-0 z-50 bg-black/50 dark:bg-black/60 backdrop-blur-sm flex items-end justify-center p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-3xl bg-[#1b202e]/95 border border-white/15 p-4 space-y-3 shadow-2xl"
+            className="w-full max-w-md rounded-3xl bg-white/95 dark:bg-[#1b202e]/95 border border-zinc-200 dark:border-white/15 p-4 space-y-3 shadow-2xl"
           >
             <div className="flex items-center justify-between px-1">
-              <span className="text-sm font-bold text-blue-400">MacroPulse</span>
+              <span className="text-sm font-bold text-blue-600 dark:text-blue-400">MacroPulse</span>
               <button
                 type="button"
                 onClick={() => setAddSheetOpen(false)}
-                className="w-11 h-11 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+                className="w-11 h-11 rounded-full flex items-center justify-center text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-white/5"
                 aria-label="Fermer"
               >
                 <XIcon className="w-4 h-4" />
@@ -1187,12 +1187,12 @@ function MacroPulseClientApp() {
               <button
                 type="button"
                 onClick={() => openQuickAdd("all", "lunch")}
-                className="flex flex-col items-center justify-center gap-2.5 py-6 px-3 rounded-2xl bg-[#252b3d] hover:bg-[#2d354b] transition"
+                className="flex flex-col items-center justify-center gap-2.5 py-6 px-3 rounded-2xl bg-zinc-100 hover:bg-zinc-200/80 dark:bg-[#252b3d] dark:hover:bg-[#2d354b] transition"
               >
                 <span className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white">
                   <SearchIcon className="w-5 h-5" />
                 </span>
-                <span className="text-xs font-semibold text-zinc-100 text-center">
+                <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 text-center">
                   Consigner un aliment
                 </span>
               </button>
@@ -1200,35 +1200,35 @@ function MacroPulseClientApp() {
               <button
                 type="button"
                 onClick={() => openQuickAdd("barcode", "lunch")}
-                className="flex flex-col items-center justify-center gap-2.5 py-6 px-3 rounded-2xl bg-[#252b3d] hover:bg-[#2d354b] transition"
+                className="flex flex-col items-center justify-center gap-2.5 py-6 px-3 rounded-2xl bg-zinc-100 hover:bg-zinc-200/80 dark:bg-[#252b3d] dark:hover:bg-[#2d354b] transition"
               >
                 <span className="w-10 h-10 rounded-full bg-rose-500 flex items-center justify-center text-white">
                   <BarcodeIcon className="w-5 h-5" />
                 </span>
-                <span className="text-xs font-semibold text-zinc-100 text-center">
+                <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 text-center">
                   Scan de code-barres
                 </span>
               </button>
             </div>
 
-            <div className="rounded-2xl bg-[#252b3d] divide-y divide-white/[0.06] overflow-hidden">
+            <div className="rounded-2xl bg-zinc-100 dark:bg-[#252b3d] divide-y divide-zinc-200 dark:divide-white/[0.06] overflow-hidden">
               <button
                 type="button"
                 onClick={() => {
                   setAddSheetOpen(false);
                   setOptimizerOpen(true);
                 }}
-                className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-100 hover:bg-white/[0.04] transition"
+                className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-white/[0.04] transition"
               >
-                <SparklesIcon className="w-4 h-4 text-blue-400" />
+                <SparklesIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 <span>Compléter / Planifier macros (Auto)</span>
               </button>
               <button
                 type="button"
                 onClick={() => openQuickAdd("photo", "lunch")}
-                className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-100 hover:bg-white/[0.04] transition"
+                className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-white/[0.04] transition"
               >
-                <SparklesIcon className="w-4 h-4 text-emerald-400" />
+                <SparklesIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Photo / Texte IA (Gemini)</span>
               </button>
               <button
@@ -1237,9 +1237,9 @@ function MacroPulseClientApp() {
                   handleAddWater(250);
                   setAddSheetOpen(false);
                 }}
-                className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-100 hover:bg-white/[0.04] transition"
+                className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-white/[0.04] transition"
               >
-                <DropletIcon className="w-4 h-4 text-blue-400" />
+                <DropletIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 <span>Eau (+250 ml)</span>
               </button>
               <button
@@ -1248,9 +1248,9 @@ function MacroPulseClientApp() {
                   setAddSheetOpen(false);
                   setActiveTab("analytics");
                 }}
-                className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-100 hover:bg-white/[0.04] transition"
+                className="w-full px-4 py-3 flex items-center gap-3 text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-white/[0.04] transition"
               >
-                <ScaleIcon className="w-4 h-4 text-emerald-400" />
+                <ScaleIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Poids & Pas</span>
               </button>
             </div>
