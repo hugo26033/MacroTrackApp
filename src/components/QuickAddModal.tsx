@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { scaleNutrients, sumNutrients } from "@/lib/calculations";
 import { compressImageFile } from "@/lib/imageUtils";
 import {
@@ -25,6 +25,7 @@ import {
   XIcon,
 } from "./Icons";
 import { NumberInput } from "./NumberInput";
+import { useModalEffects } from "@/lib/useModalEffects";
 
 export type QuickAddTabMode = "all" | "recipes" | "foods" | "barcode" | "photo" | "text" | "manual";
 
@@ -51,8 +52,17 @@ const MEAL_SLOTS: { value: MealSlot; label: string }[] = [
   { value: "snack", label: "Snacks" },
 ];
 
-export function QuickAddModal({
-  open,
+export function QuickAddModal(props: QuickAddModalProps) {
+  if (!props.open) return null;
+  return (
+    <QuickAddModalContent
+      key={`${props.initialTab ?? "all"}-${props.initialMealSlot ?? "lunch"}`}
+      {...props}
+    />
+  );
+}
+
+function QuickAddModalContent({
   onClose,
   selectedDate,
   foods,
@@ -125,16 +135,15 @@ export function QuickAddModal({
   const [adjustedRecipeItems, setAdjustedRecipeItems] = useState<RecipeItem[]>([]);
   const [recipePortionsToLog, setRecipePortionsToLog] = useState(1);
 
+  const shouldSearchOff =
+    (searchQuery.trim().length >= 2 || brandQuery.trim().length >= 2) &&
+    (tab === "all" || tab === "foods");
+
   useEffect(() => {
+    if (!shouldSearchOff) return;
+
     const q = searchQuery.trim();
     const brand = brandQuery.trim();
-    if ((q.length < 2 && brand.length < 2) || (tab !== "all" && tab !== "foods")) {
-      setOffResults([]);
-      setOffError(null);
-      setOffLoading(false);
-      return;
-    }
-
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       setOffLoading(true);
@@ -166,40 +175,13 @@ export function QuickAddModal({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [searchQuery, brandQuery, tab]);
+  }, [shouldSearchOff, searchQuery, brandQuery]);
 
-  useEffect(() => {
-    if (open) {
-      setTab(initialTab);
-      setMealSlot(initialMealSlot);
-      setSearchQuery("");
-      setBrandQuery("");
-      setSelectedFood(null);
-      setCreatingRecipe(false);
-      setSelectedRecipe(null);
-    } else {
-      stopCamera();
-      setPhotoPreview(null);
-      setBarcodePhotoPreview(null);
-      setBarcodeInput("");
-      setBarcodeError(null);
-      setBarcodeSavedMsg(null);
-      setFoundProduct(null);
-      setAiItems([]);
-      setAiError(null);
-      setAiText("");
-    }
-    return () => stopCamera();
-  }, [open, initialTab, initialMealSlot]);
+  const visibleOffResults = shouldSearchOff ? offResults : [];
+  const visibleOffLoading = shouldSearchOff && offLoading;
+  const visibleOffError = shouldSearchOff ? offError : null;
 
-  useEffect(() => {
-    if (scanningCamera && videoRef.current && streamRef.current) {
-      videoRef.current.srcObject = streamRef.current;
-      videoRef.current.play().catch(() => {});
-    }
-  }, [scanningCamera]);
-
-  function stopCamera() {
+  const releaseCameraResources = useCallback(() => {
     if (scanTimerRef.current !== null) {
       window.clearTimeout(scanTimerRef.current);
       scanTimerRef.current = null;
@@ -211,8 +193,23 @@ export function QuickAddModal({
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+  }, []);
+
+  const stopCamera = useCallback(() => {
+    releaseCameraResources();
     setScanningCamera(false);
-  }
+  }, [releaseCameraResources]);
+
+  useEffect(() => {
+    return () => releaseCameraResources();
+  }, [releaseCameraResources]);
+
+  useEffect(() => {
+    if (scanningCamera && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [scanningCamera]);
 
   async function getBarcodeDetector() {
     type DetectorInstance = {
@@ -289,12 +286,8 @@ export function QuickAddModal({
 
       // 1. Essai local instantané (ZXing WASM / BarcodeDetector natif, 0 quota Gemini)
       try {
-        const detector = await getBarcodeDetector();
-        const bitmap = await createImageBitmap(file);
-        const codes = await detector.detect(bitmap);
-        bitmap.close?.();
-        if (codes.length > 0 && codes[0].rawValue) {
-          const code = codes[0].rawValue;
+        const code = await decodeBarcodeFromFile(file);
+        if (code) {
           setBarcodeInput(code);
           await lookupBarcode(code);
           return;
@@ -863,8 +856,6 @@ export function QuickAddModal({
     onClose();
   }
 
-  if (!open) return null;
-
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const normalizedBrand = brandQuery.trim().toLowerCase();
   const filteredFoods = foods.filter((f) => {
@@ -882,7 +873,7 @@ export function QuickAddModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-sm p-0 sm:p-4">
-      <div className="w-full max-w-xl max-h-[94vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[#0f131d] border border-white/10 text-zinc-100 shadow-2xl p-5 space-y-4">
+      <div className="w-full max-w-xl max-h-[94vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[#0f131d] border border-white/10 text-zinc-100 shadow-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5 space-y-4">
         {/* Top Bar: Close + Meal Slot Dropdown */}
         <div className="flex items-center justify-between gap-3">
           <button
@@ -1804,20 +1795,20 @@ export function QuickAddModal({
                       <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                         Base Open Food Facts
                       </h4>
-                      {offLoading && (
+                      {visibleOffLoading && (
                         <span className="text-xs text-blue-400">Recherche...</span>
                       )}
                     </div>
-                    {offError && (
-                      <p className="text-xs text-amber-400">{offError}</p>
+                    {visibleOffError && (
+                      <p className="text-xs text-amber-400">{visibleOffError}</p>
                     )}
-                    {!offLoading && !offError && offResults.length === 0 && (
+                    {!visibleOffLoading && !visibleOffError && visibleOffResults.length === 0 && (
                       <p className="text-xs text-zinc-500 py-2">
                         Aucun produit trouvé sur Open Food Facts pour « {[searchQuery.trim(), brandQuery.trim()].filter(Boolean).join(" · ")} ».
                       </p>
                     )}
                     <div className="space-y-2">
-                      {offResults.map((f) => {
+                      {visibleOffResults.map((f) => {
                         const scaled = scaleNutrients(f.per100g, f.servingSizeG);
                         return (
                           <div
@@ -1867,6 +1858,7 @@ export function QuickAddModal({
                   className="hidden"
                 />
                 {barcodePhotoPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={barcodePhotoPreview}
                     alt="Photo du code-barres"
@@ -2072,6 +2064,7 @@ export function QuickAddModal({
                     className="hidden"
                   />
                   {photoPreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={photoPreview}
                       alt="Aperçu du repas"

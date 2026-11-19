@@ -1,6 +1,5 @@
 import {
   ActivityLevel,
-  FastingStatus,
   FoodLogEntry,
   NutrientValues,
   StepEntry,
@@ -19,18 +18,32 @@ const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
   very_active: 1.9,
 };
 
+export function toLocalISO(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function todayISO(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return toLocalISO(new Date());
 }
 
 export function prevDateISO(isoDate: string): string {
   const d = new Date(`${isoDate}T12:00:00`);
   d.setDate(d.getDate() - 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return toLocalISO(d);
+}
+
+export function formatFrNumber(
+  value: number,
+  maxDecimals = 1,
+  minDecimals?: number
+): string {
+  return value.toLocaleString("fr-FR", {
+    maximumFractionDigits: maxDecimals,
+    minimumFractionDigits: minDecimals,
+  });
 }
 
 export function scaleNutrients(per100g: NutrientValues, quantityG: number): NutrientValues {
@@ -254,93 +267,6 @@ export function calculateTdee(params: {
 }
 
 /**
- * Calcul automatique du jeûne intermittent à partir des horaires du premier et dernier repas loggés.
- */
-export function computeAutomaticFasting(
-  foodLogs: FoodLogEntry[],
-  targetHours: number
-): FastingStatus {
-  const sortedLogs = [...foodLogs].sort((a, b) => a.loggedAt.localeCompare(b.loggedAt));
-  if (sortedLogs.length === 0) {
-    return {
-      isCurrentlyFasting: false,
-      currentFastHours: 0,
-      lastMealAt: null,
-      targetHours,
-      progressPct: 0,
-      dailyFasts: [],
-      averageFastHours: 0,
-      streakDays: 0,
-    };
-  }
-
-  const lastMeal = sortedLogs[sortedLogs.length - 1];
-  const lastMealTimeMs = new Date(lastMeal.loggedAt).getTime();
-  const currentFastHours = round1(Math.max(0, (Date.now() - lastMealTimeMs) / 3600000));
-  const progressPct = Math.min(100, Math.round((currentFastHours / targetHours) * 100));
-
-  // Grouper par date pour trouver premier & dernier repas de chaque jour
-  const byDate = new Map<string, FoodLogEntry[]>();
-  for (const log of sortedLogs) {
-    const list = byDate.get(log.logDate) ?? [];
-    list.push(log);
-    byDate.set(log.logDate, list);
-  }
-
-  const dates = Array.from(byDate.keys()).sort();
-  const dailyFasts: FastingStatus["dailyFasts"] = [];
-
-  for (let i = 0; i < dates.length; i++) {
-    const date = dates[i];
-    const dayLogs = byDate.get(date)!;
-    const first = dayLogs[0];
-    const last = dayLogs[dayLogs.length - 1];
-
-    let fastHours: number | null = null;
-    if (i > 0) {
-      const prevLogs = byDate.get(dates[i - 1])!;
-      const prevLast = prevLogs[prevLogs.length - 1];
-      const diffHours =
-        (new Date(first.loggedAt).getTime() - new Date(prevLast.loggedAt).getTime()) / 3600000;
-      if (diffHours >= 4 && diffHours <= 48) {
-        fastHours = round1(diffHours);
-      }
-    }
-
-    dailyFasts.push({
-      date,
-      firstMealTime: formatTimeHHMM(first.loggedAt),
-      lastMealTime: formatTimeHHMM(last.loggedAt),
-      fastHours,
-      metTarget: fastHours !== null ? fastHours >= targetHours : false,
-    });
-  }
-
-  const completed = dailyFasts.filter((d) => d.fastHours !== null);
-  const averageFastHours =
-    completed.length > 0
-      ? round1(completed.reduce((s, d) => s + (d.fastHours ?? 0), 0) / completed.length)
-      : 0;
-
-  let streakDays = 0;
-  for (let i = completed.length - 1; i >= 0; i--) {
-    if (completed[i].metTarget) streakDays++;
-    else break;
-  }
-
-  return {
-    isCurrentlyFasting: currentFastHours >= 1,
-    currentFastHours,
-    lastMealAt: lastMeal.loggedAt,
-    targetHours,
-    progressPct,
-    dailyFasts: dailyFasts.slice(-14).reverse(),
-    averageFastHours,
-    streakDays,
-  };
-}
-
-/**
  * Agrège les pas par semaine ou par mois pour les graphiques d'évolution.
  */
 export function aggregateSeriesByRange<T extends { date: string; value: number }>(
@@ -424,11 +350,6 @@ export function parseStepsImportText(
 function formatShortDate(iso: string): string {
   const [, m, d] = iso.split("-");
   return `${d}/${m}`;
-}
-
-function formatTimeHHMM(iso: string): string {
-  const dt = new Date(iso);
-  return `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
 }
 
 export function round1(n: number): number {

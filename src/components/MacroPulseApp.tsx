@@ -1,18 +1,22 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import dynamic from "next/dynamic";
 import {
   analyzeWeightTrends,
+  formatFrNumber,
+  prevDateISO,
   sumNutrients,
+  toLocalISO,
   todayISO,
 } from "@/lib/calculations";
 import {
   AppState,
-  EMPTY_APP_STATE,
   createInitialDemoState,
   exportAppStateAsJSON,
   exportFoodLogsAsCSV,
   loadAppState,
+  parseImportedAppState,
   saveAppState,
 } from "@/lib/storage";
 import {
@@ -23,8 +27,6 @@ import {
   Recipe,
   StepEntry,
 } from "@/lib/types";
-import { AnalyticsView } from "./AnalyticsView";
-import { GoalsTdeeView } from "./GoalsTdeeView";
 import {
   BarcodeIcon,
   ChartIcon,
@@ -34,7 +36,6 @@ import {
   CopyIcon,
   DropletIcon,
   FlameIcon,
-  FootprintsIcon,
   HomeIcon,
   MoonIcon,
   PencilIcon,
@@ -48,10 +49,34 @@ import {
   UserIcon,
   XIcon,
 } from "./Icons";
-import { QuickAddModal, QuickAddTabMode } from "./QuickAddModal";
-import { ProfileMenuModal } from "./ProfileMenuModal";
-import { FoodLogDetailModal } from "./FoodLogDetailModal";
-import { MacroOptimizerModal } from "./MacroOptimizerModal";
+import type { QuickAddTabMode } from "./QuickAddModal";
+
+const AnalyticsView = dynamic(
+  () => import("./AnalyticsView").then((m) => m.AnalyticsView),
+  { ssr: false }
+);
+const GoalsTdeeView = dynamic(
+  () => import("./GoalsTdeeView").then((m) => m.GoalsTdeeView),
+  { ssr: false }
+);
+const QuickAddModal = dynamic(
+  () => import("./QuickAddModal").then((m) => m.QuickAddModal),
+  { ssr: false }
+);
+const ProfileMenuModal = dynamic(
+  () => import("./ProfileMenuModal").then((m) => m.ProfileMenuModal),
+  { ssr: false }
+);
+const FoodLogDetailModal = dynamic(
+  () => import("./FoodLogDetailModal").then((m) => m.FoodLogDetailModal),
+  { ssr: false }
+);
+const MacroOptimizerModal = dynamic(
+  () => import("./MacroOptimizerModal").then((m) => m.MacroOptimizerModal),
+  { ssr: false }
+);
+
+const subscribeNoop = () => () => {};
 
 type ActiveTab = "today" | "analytics" | "goals";
 
@@ -86,22 +111,29 @@ function getWeekDaysISO(centerISO: string): string[] {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
-    return d.toISOString().slice(0, 10);
+    return toLocalISO(d);
   });
 }
 
 export function MacroPulseApp() {
-  const [state, setState] = useState<AppState>(EMPTY_APP_STATE);
-  const [hydrated, setHydrated] = useState(false);
+  const isClient = useSyncExternalStore(subscribeNoop, () => true, () => false);
+  if (!isClient) {
+    return <div className="min-h-screen bg-[#0f131d]" />;
+  }
+  return <MacroPulseClientApp />;
+}
+
+function MacroPulseClientApp() {
+  const [state, setState] = useState<AppState>(() => loadAppState());
   const [activeTab, setActiveTab] = useState<ActiveTab>("today");
-  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>(() => todayISO());
 
   // Modals & UI toggles
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<FoodLogEntry | null>(null);
   const [optimizerOpen, setOptimizerOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [calendarMonth, setCalendarMonth] = useState<string>("");
+  const [calendarMonth, setCalendarMonth] = useState<string>(() => todayISO().slice(0, 7));
   const [showMicronutrients, setShowMicronutrients] = useState(false);
   const [showFullJournal, setShowFullJournal] = useState(false);
   const [expandedMeals, setExpandedMeals] = useState<Record<MealSlot, boolean>>({
@@ -114,24 +146,29 @@ export function MacroPulseApp() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddTab, setQuickAddTab] = useState<QuickAddTabMode>("all");
   const [quickAddSlot, setQuickAddSlot] = useState<MealSlot>("lunch");
+  const [toast, setToast] = useState<{ type: "error" | "success"; message: string } | null>(null);
 
   useEffect(() => {
-    const today = todayISO();
-    setState(loadAppState());
-    setSelectedDate(today);
-    setCalendarMonth(today.slice(0, 7));
-    setHydrated(true);
-
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
   }, []);
 
   useEffect(() => {
-    if (hydrated) {
-      saveAppState(state);
+    const res = saveAppState(state);
+    if (!res.ok) {
+      const timer = window.setTimeout(() => {
+        setToast({ type: "error", message: res.message });
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
-  }, [state, hydrated]);
+  }, [state]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   const isDark = state.profile.theme === "dark";
 
@@ -171,9 +208,7 @@ export function MacroPulseApp() {
   const weekDays = useMemo(() => getWeekDaysISO(selectedDate), [selectedDate]);
 
   const streakCount = useMemo(() => {
-    if (!hydrated || loggedDatesSet.size === 0) return 0;
-    const toLocalISO = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    if (loggedDatesSet.size === 0) return 0;
 
     const today = todayISO();
     let count = 0;
@@ -187,19 +222,13 @@ export function MacroPulseApp() {
       cursor.setDate(cursor.getDate() - 1);
     }
     return count;
-  }, [hydrated, loggedDatesSet]);
+  }, [loggedDatesSet]);
 
   function openQuickAdd(tab: QuickAddTabMode = "all", slot: MealSlot = "lunch") {
     setAddSheetOpen(false);
     setQuickAddTab(tab);
     setQuickAddSlot(slot);
     setQuickAddOpen(true);
-  }
-
-  function shiftDate(deltaDays: number) {
-    const d = new Date(`${selectedDate || todayISO()}T12:00:00`);
-    d.setDate(d.getDate() + deltaDays);
-    setSelectedDate(d.toISOString().slice(0, 10));
   }
 
   function handleAddFoodLogs(newLogs: Omit<FoodLogEntry, "id">[]) {
@@ -265,9 +294,7 @@ export function MacroPulseApp() {
   }
 
   function handleDuplicateYesterday(slotFilter?: MealSlot) {
-    const d = new Date(`${selectedDate || todayISO()}T12:00:00`);
-    d.setDate(d.getDate() - 1);
-    const yesterday = d.toISOString().slice(0, 10);
+    const yesterday = prevDateISO(selectedDate || todayISO());
     const yesterdayLogs = state.foodLogs.filter(
       (l) => l.logDate === yesterday && (!slotFilter || l.mealSlot === slotFilter)
     );
@@ -357,6 +384,38 @@ export function MacroPulseApp() {
     URL.revokeObjectURL(url);
   }
 
+  async function handleImportJSONFile(file: File) {
+    try {
+      const raw = await file.text();
+      const result = parseImportedAppState(raw);
+      if (!result.ok) {
+        setToast({ type: "error", message: result.error });
+        return;
+      }
+      const { summary } = result;
+      const confirmed = window.confirm(
+        `Restaurer cette sauvegarde MacroPulse ?\n\n` +
+          `• ${summary.foodLogs} entrées repas\n` +
+          `• ${summary.weights} pesées\n` +
+          `• ${summary.steps} jours de pas\n` +
+          `• ${summary.foods} aliments & ${summary.recipes} recettes\n\n` +
+          `Les données actuelles seront remplacées.`
+      );
+      if (!confirmed) return;
+
+      setState(result.state);
+      setToast({
+        type: "success",
+        message: `Sauvegarde restaurée (${summary.foodLogs} repas, ${summary.weights} pesées).`,
+      });
+    } catch {
+      setToast({
+        type: "error",
+        message: "Impossible de lire le fichier de sauvegarde sélectionné.",
+      });
+    }
+  }
+
   const kcalPct = Math.min(100, Math.round((dayTotals.kcal / Math.max(1, state.goals.targetKcal)) * 100));
   const kcalRemaining = state.goals.targetKcal - dayTotals.kcal;
   const dailyNote = state.dailyNotes?.[selectedDate] ?? "";
@@ -367,13 +426,13 @@ export function MacroPulseApp() {
 
   return (
     <div
-      className={`min-h-screen pb-28 transition-colors ${
+      className={`min-h-screen pb-[calc(7rem+env(safe-area-inset-bottom))] transition-colors ${
         isDark ? "bg-[#0f131d] text-zinc-100" : "bg-zinc-100 text-zinc-900"
       }`}
     >
       {/* Top Bar */}
       <header
-        className={`sticky top-0 z-30 backdrop-blur-md ${
+        className={`sticky top-0 z-30 backdrop-blur-md pt-[env(safe-area-inset-top)] ${
           isDark ? "bg-[#0f131d]/90" : "bg-zinc-100/90"
         }`}
       >
@@ -382,7 +441,7 @@ export function MacroPulseApp() {
             <button
               type="button"
               onClick={() => setDatePickerOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 text-2xl font-bold tracking-tight"
+              className="min-h-11 inline-flex items-center gap-1.5 text-2xl font-bold tracking-tight"
             >
               <span>{formatDateHeader(selectedDate)}</span>
               <ChevronDownIcon className="w-5 h-5 text-zinc-400 mt-0.5" />
@@ -404,19 +463,20 @@ export function MacroPulseApp() {
                   profile: { ...prev.profile, theme: isDark ? "light" : "dark" },
                 }))
               }
-              className={`w-9 h-9 rounded-full border flex items-center justify-center transition ${
+              className={`w-11 h-11 rounded-full border flex items-center justify-center transition ${
                 isDark
                   ? "bg-[#181d2a] border-white/10 text-zinc-300 hover:bg-[#22283a]"
                   : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50"
               }`}
               title="Changer de thème"
+              aria-label="Changer de thème"
             >
               {isDark ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
             </button>
             <button
               type="button"
               onClick={() => setProfileMenuOpen(true)}
-              className={`w-9 h-9 rounded-full border flex items-center justify-center transition ${
+              className={`w-11 h-11 rounded-full border flex items-center justify-center transition ${
                 profileMenuOpen || activeTab === "goals"
                   ? "bg-blue-500 border-blue-400 text-white"
                   : isDark
@@ -424,6 +484,7 @@ export function MacroPulseApp() {
                     : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50"
               }`}
               title="Menu Profil"
+              aria-label="Menu Profil"
             >
               <UserIcon className="w-4 h-4" />
             </button>
@@ -467,7 +528,8 @@ export function MacroPulseApp() {
                   <button
                     type="button"
                     onClick={() => shiftCalMonth(-1)}
-                    className="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium"
+                    className="min-w-11 min-h-11 px-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium flex items-center justify-center"
+                    aria-label="Mois précédent"
                   >
                     ←
                   </button>
@@ -480,14 +542,15 @@ export function MacroPulseApp() {
                         setCalendarMonth(todayStr.slice(0, 7));
                         setDatePickerOpen(false);
                       }}
-                      className="px-2.5 py-1.5 rounded-xl bg-blue-500/15 text-blue-400 text-xs font-medium"
+                      className="min-h-11 px-3 rounded-xl bg-blue-500/15 text-blue-400 text-xs font-medium flex items-center justify-center"
                     >
                       Aujourd&apos;hui
                     </button>
                     <button
                       type="button"
                       onClick={() => shiftCalMonth(1)}
-                      className="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium"
+                      className="min-w-11 min-h-11 px-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium flex items-center justify-center"
+                      aria-label="Mois suivant"
                     >
                       →
                     </button>
@@ -970,6 +1033,7 @@ export function MacroPulseApp() {
                 "application/json"
               )
             }
+            onImportJSON={handleImportJSONFile}
             onExportCSV={() =>
               downloadFile(
                 `macropulse-repas-${todayISO()}.csv`,
@@ -993,8 +1057,35 @@ export function MacroPulseApp() {
         )}
       </main>
 
+      {/* Toast Notification (quota localStorage / import JSON) */}
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] inset-x-0 z-50 px-4 pointer-events-none"
+        >
+          <div
+            className={`pointer-events-auto max-w-md mx-auto rounded-2xl border px-4 py-3 shadow-2xl backdrop-blur-xl flex items-start justify-between gap-3 text-xs font-medium ${
+              toast.type === "error"
+                ? "bg-rose-950/95 border-rose-500/40 text-rose-100"
+                : "bg-emerald-950/95 border-emerald-500/40 text-emerald-100"
+            }`}
+          >
+            <span className="leading-relaxed">{toast.message}</span>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              className="p-0.5 opacity-75 hover:opacity-100 shrink-0"
+              aria-label="Fermer la notification"
+            >
+              <XIcon className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Floating Bottom Navigation (Aujourd'hui / Progression + FAB '+') */}
-      <nav className="fixed bottom-4 inset-x-0 z-40 px-4 pointer-events-none">
+      <nav className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] inset-x-0 z-40 px-4 pointer-events-none">
         <div className="max-w-md mx-auto flex items-center gap-3">
           <div
             className={`pointer-events-auto flex-1 rounded-full border backdrop-blur-xl p-1.5 grid grid-cols-2 shadow-xl ${
@@ -1049,7 +1140,7 @@ export function MacroPulseApp() {
       {addSheetOpen && (
         <div
           onClick={() => setAddSheetOpen(false)}
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center p-3"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -1179,6 +1270,7 @@ export function MacroPulseApp() {
             "application/json"
           )
         }
+        onImportJSON={handleImportJSONFile}
         onExportCSV={() =>
           downloadFile(
             `macropulse-repas-${todayISO()}.csv`,

@@ -54,7 +54,6 @@ export interface UserProfile {
   activityLevel: ActivityLevel;
   bodyFatPct?: number;
   theme: "dark" | "light";
-  fastingTargetHours: number;
   weightTrendThresholdKgWeek: number;
   adaptiveTdeeEnabled: boolean;
   pinnedMicronutrients: MicronutrientKey[];
@@ -96,7 +95,7 @@ export interface FoodItem {
 export interface FoodLogEntry {
   id: string;
   logDate: string; // YYYY-MM-DD
-  loggedAt: string; // ISO timestamp for automatic fasting calculation
+  loggedAt: string; // ISO timestamp
   mealSlot: MealSlot;
   foodName: string;
   brand?: string;
@@ -163,23 +162,6 @@ export interface WeightTrendAnalysis {
   status5: TrendDirection;
   delta3Kg: number | null;
   delta5Kg: number | null;
-}
-
-export interface FastingStatus {
-  isCurrentlyFasting: boolean;
-  currentFastHours: number;
-  lastMealAt: string | null;
-  targetHours: number;
-  progressPct: number;
-  dailyFasts: {
-    date: string;
-    firstMealTime: string | null;
-    lastMealTime: string | null;
-    fastHours: number | null;
-    metTarget: boolean;
-  }[];
-  averageFastHours: number;
-  streakDays: number;
 }
 
 export interface GeminiDetectedFood {

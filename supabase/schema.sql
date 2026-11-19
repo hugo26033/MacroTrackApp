@@ -13,7 +13,6 @@ create table if not exists public.profiles (
   activity_level text check (activity_level in ('sedentary', 'light', 'moderate', 'active', 'very_active')) default 'moderate',
   body_fat_pct numeric(4,1),
   theme text check (theme in ('dark', 'light')) default 'dark',
-  fasting_target_hours numeric(4,1) default 16.0,
   weight_trend_threshold_kg_week numeric(4,2) default 0.15,
   adaptive_tdee_enabled boolean default true,
   pinned_micronutrients jsonb default '["fiber_g", "sugar_g", "saturated_fat_g", "sodium_mg", "iron_mg", "vitamin_d_ug", "magnesium_mg"]'::jsonb,
@@ -81,7 +80,7 @@ create table if not exists public.recipes (
   created_at timestamptz default now()
 );
 
--- 5. Journal alimentaire (avec timestamp précis pour le jeûne intermittent automatique)
+-- 5. Journal alimentaire
 create table if not exists public.food_logs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,

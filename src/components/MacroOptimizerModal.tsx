@@ -16,6 +16,7 @@ import type {
   Recipe,
 } from "@/lib/types";
 import { PlusIcon, SparklesIcon, TrashIcon, XIcon } from "./Icons";
+import { useModalEffects } from "@/lib/useModalEffects";
 
 interface MacroOptimizerModalProps {
   open: boolean;
@@ -34,6 +35,15 @@ const MEAL_SLOTS: { value: MealSlot; label: string }[] = [
   { value: "dinner", label: "Dîner" },
   { value: "snack", label: "Collation" },
 ];
+
+let optimizerSeq = 0;
+function createOptimizerId(prefix: string): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
+  }
+  optimizerSeq += 1;
+  return `${prefix}-${optimizerSeq}`;
+}
 
 export function MacroOptimizerModal({
   open,
@@ -72,6 +82,8 @@ export function MacroOptimizerModal({
 
   const solved = useMemo(() => optimizeMealQuantities(items, target), [items, target]);
 
+  useModalEffects(open, onClose);
+
   if (!open) return null;
 
   const filteredFoods = foods.filter((f) =>
@@ -86,7 +98,7 @@ export function MacroOptimizerModal({
     const minG = isUnit ? food.servingSizeG * 0.5 : 20;
     const maxG = isUnit ? food.servingSizeG * 5 : 350;
     const newItem: OptimizerItem = {
-      id: `opt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      id: createOptimizerId("opt"),
       name: food.name,
       mealSlot: defaultSlot,
       per100g: food.per100g,
@@ -115,7 +127,7 @@ export function MacroOptimizerModal({
       micronutrients: {},
     };
     const newItem: OptimizerItem = {
-      id: `opt-rec-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      id: createOptimizerId("opt-rec"),
       name: recipe.name,
       mealSlot: defaultSlot,
       per100g,
@@ -227,7 +239,7 @@ export function MacroOptimizerModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-gradient-to-b from-[#1a2030] to-[#121622] border border-white/[0.08] text-zinc-100 shadow-2xl p-5 space-y-4"
+        className="w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-gradient-to-b from-[#1a2030] to-[#121622] border border-white/[0.08] text-zinc-100 shadow-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5 space-y-4"
       >
         {/* Header */}
         <div className="flex items-center justify-between gap-2">

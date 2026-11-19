@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 
 interface NumberInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> {
@@ -27,12 +27,6 @@ export function NumberInput({
 }: NumberInputProps) {
   const [focused, setFocused] = useState(false);
   const [raw, setRaw] = useState<string>(String(value));
-
-  useEffect(() => {
-    if (!focused) {
-      setRaw(String(value));
-    }
-  }, [value, focused]);
 
   function clamp(num: number): number {
     let n = num;
@@ -76,9 +70,10 @@ export function NumberInput({
       {...rest}
       type="text"
       inputMode={rest.step && String(rest.step).includes(".") ? "decimal" : "numeric"}
-      value={raw}
+      value={focused ? raw : String(value)}
       onChange={handleChange}
       onFocus={(e) => {
+        setRaw(String(value));
         setFocused(true);
         onFocus?.(e);
       }}

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useId, useState } from "react";
+import { formatFrNumber } from "@/lib/calculations";
 import type { WeightPointWithTrends } from "@/lib/types";
 
 function makeSmoothPath(coords: Array<{ x: number; y: number } | null>): string {
@@ -105,26 +106,31 @@ export function WeightTrendChart({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-4">
-          <span className="inline-flex items-center gap-1.5 text-zinc-400">
+          <span className="inline-flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400">
             <span className="w-2 h-2 rounded-full bg-zinc-400 inline-block" /> Brut
           </span>
-          <span className="inline-flex items-center gap-1.5 text-emerald-400">
-            <span className="w-3 h-0.5 bg-emerald-400 inline-block rounded-full" /> Tendance 3j
+          <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+            <span className="w-3 h-0.5 bg-emerald-500 dark:bg-emerald-400 inline-block rounded-full" /> Tendance 3j
           </span>
-          <span className="inline-flex items-center gap-1.5 text-sky-400">
-            <span className="w-3 h-0.5 bg-sky-400 inline-block rounded-full" /> Tendance 5j
+          <span className="inline-flex items-center gap-1.5 text-sky-600 dark:text-sky-400">
+            <span className="w-3 h-0.5 bg-sky-500 dark:bg-sky-400 inline-block rounded-full" /> Tendance 5j
           </span>
         </div>
         {activePoint && (
-          <div className="font-mono text-zinc-300 bg-white/[0.04] border border-white/[0.06] px-2.5 py-1 rounded-lg">
-            {activePoint.logDate.slice(5)} · Brut <strong>{activePoint.weightKg}</strong> · 3j{" "}
-            <strong className="text-emerald-400">{activePoint.ma3 ?? "-"}</strong> · 5j{" "}
-            <strong className="text-sky-400">{activePoint.ma5 ?? "-"}</strong>
+          <div className="font-mono text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-white/[0.04] border border-zinc-200 dark:border-white/[0.06] px-2.5 py-1 rounded-lg">
+            {activePoint.logDate.slice(5)} · Brut <strong>{formatFrNumber(activePoint.weightKg)}</strong> · 3j{" "}
+            <strong className="text-emerald-600 dark:text-emerald-400">
+              {activePoint.ma3 !== null ? formatFrNumber(activePoint.ma3) : "-"}
+            </strong>{" "}
+            · 5j{" "}
+            <strong className="text-sky-600 dark:text-sky-400">
+              {activePoint.ma5 !== null ? formatFrNumber(activePoint.ma5) : "-"}
+            </strong>
             {prevDayKcalByDate && prevDayKcalByDate[activePoint.logDate] !== undefined && (
               <>
                 {" "}
                 · Veille{" "}
-                <strong className="text-amber-300">
+                <strong className="text-amber-600 dark:text-amber-300">
                   {prevDayKcalByDate[activePoint.logDate].toLocaleString("fr-FR")} cal
                 </strong>
               </>
@@ -155,7 +161,7 @@ export function WeightTrendChart({
               x2={width - padR}
               y1={yAt(tick)}
               y2={yAt(tick)}
-              stroke="rgba(255,255,255,0.06)"
+              className="stroke-zinc-200 dark:stroke-white/[0.06]"
               strokeDasharray="3 3"
             />
             <text
@@ -164,7 +170,7 @@ export function WeightTrendChart({
               textAnchor="end"
               className="fill-zinc-500 text-[10px] font-mono"
             >
-              {tick.toFixed(1)}
+              {formatFrNumber(tick, 1, 1)}
             </text>
           </g>
         ))}
@@ -181,7 +187,7 @@ export function WeightTrendChart({
             x2={xAt(activeIdx)}
             y1={padT}
             y2={padT + plotH}
-            stroke="rgba(255,255,255,0.16)"
+            className="stroke-zinc-300 dark:stroke-white/[0.16]"
             strokeDasharray="2 2"
           />
         )}
@@ -192,7 +198,11 @@ export function WeightTrendChart({
               cx={xAt(i)}
               cy={yAt(d.weightKg)}
               r={activeIdx === i ? 5 : 2.5}
-              className={activeIdx === i ? "fill-emerald-400 stroke-zinc-950" : "fill-zinc-300 stroke-zinc-900"}
+              className={
+                activeIdx === i
+                  ? "fill-emerald-500 dark:fill-emerald-400 stroke-white dark:stroke-zinc-950"
+                  : "fill-zinc-500 dark:fill-zinc-300 stroke-white dark:stroke-zinc-900"
+              }
               strokeWidth="1.5"
             />
             {(i === 0 || i === data.length - 1 || i === Math.floor(data.length / 2)) && (
@@ -266,7 +276,7 @@ export function BarHistoryChart({
 
   return (
     <div className="space-y-2.5">
-      <div className="flex flex-wrap justify-between items-center gap-2 text-xs text-zinc-400">
+      <div className="flex flex-wrap justify-between items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
         <div className="flex items-center gap-2">
           <span>{target ? `Objectif : ${target.toLocaleString("fr-FR")} ${unit}` : ""}</span>
           <button
@@ -274,15 +284,15 @@ export function BarHistoryChart({
             onClick={() => setZoomY((z) => !z)}
             className={`px-2 py-0.5 rounded-lg border text-[10px] font-medium transition ${
               zoomY
-                ? "bg-blue-500/15 border-blue-500/40 text-blue-300"
-                : "bg-white/5 border-white/10 text-zinc-400"
+                ? "bg-blue-500/15 border-blue-500/40 text-blue-600 dark:text-blue-300"
+                : "bg-zinc-100 dark:bg-white/5 border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-400"
             }`}
           >
             {zoomY ? "Zoom actif" : "Vue 0"}
           </button>
         </div>
         {active && (
-          <span className="font-mono text-zinc-200 bg-white/[0.04] border border-white/[0.06] px-2 py-0.5 rounded-lg">
+          <span className="font-mono text-zinc-700 dark:text-zinc-200 bg-zinc-100 dark:bg-white/[0.04] border border-zinc-200 dark:border-white/[0.06] px-2 py-0.5 rounded-lg">
             {active.label} : <strong>{active.value.toLocaleString("fr-FR")}</strong> {unit}
           </span>
         )}

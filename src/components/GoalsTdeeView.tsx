@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useRef } from "react";
 import { calculateTdee } from "@/lib/calculations";
 import {
   ActivityLevel,
@@ -21,6 +21,7 @@ interface GoalsTdeeViewProps {
   onUpdateProfile: (patch: Partial<UserProfile>) => void;
   onUpdateGoals: (patch: Partial<NutritionGoals>) => void;
   onExportJSON: () => void;
+  onImportJSON: (file: File) => void;
   onExportCSV: () => void;
   onResetDemo: () => void;
   onClearAllData: () => void;
@@ -42,10 +43,12 @@ export function GoalsTdeeView({
   onUpdateProfile,
   onUpdateGoals,
   onExportJSON,
+  onImportJSON,
   onExportCSV,
   onResetDemo,
   onClearAllData,
 }: GoalsTdeeViewProps) {
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const latestWeight = weights.length > 0 ? weights[weights.length - 1].weightKg : 75;
   const tdee = calculateTdee({
     profile,
@@ -94,10 +97,10 @@ export function GoalsTdeeView({
       <h2 className="text-lg font-semibold">Objectifs, TDEE & Réglages</h2>
 
       {/* Calculateur TDEE + TDEE Adaptatif */}
-      <section className="rounded-3xl bg-zinc-900/80 border border-zinc-800 p-5 space-y-4">
+      <section className="rounded-3xl bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-semibold text-sm sm:text-base">Calculateur TDEE & Adaptatif</h3>
-          <label className="inline-flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+          <label className="inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300 cursor-pointer">
             <input
               type="checkbox"
               checked={profile.adaptiveTdeeEnabled}
@@ -110,38 +113,38 @@ export function GoalsTdeeView({
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <label className="space-y-1 text-xs">
-            <span className="text-zinc-400">Sexe</span>
+            <span className="text-zinc-500 dark:text-zinc-400">Sexe</span>
             <select
               value={profile.sex}
               onChange={(e) => onUpdateProfile({ sex: e.target.value as "male" | "female" })}
-              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-2.5 py-2"
+              className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 px-2.5 py-2 text-zinc-900 dark:text-zinc-100"
             >
               <option value="male">Homme</option>
               <option value="female">Femme</option>
             </select>
           </label>
           <label className="space-y-1 text-xs">
-            <span className="text-zinc-400">Âge</span>
+            <span className="text-zinc-500 dark:text-zinc-400">Âge</span>
             <NumberInput
               min={10}
               max={120}
               value={profile.age}
               onValueChange={(age) => onUpdateProfile({ age })}
-              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-2.5 py-2 font-mono"
+              className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 px-2.5 py-2 font-mono text-zinc-900 dark:text-zinc-100"
             />
           </label>
           <label className="space-y-1 text-xs">
-            <span className="text-zinc-400">Taille (cm)</span>
+            <span className="text-zinc-500 dark:text-zinc-400">Taille (cm)</span>
             <NumberInput
               min={100}
               max={250}
               value={profile.heightCm}
               onValueChange={(heightCm) => onUpdateProfile({ heightCm })}
-              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-2.5 py-2 font-mono"
+              className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 px-2.5 py-2 font-mono text-zinc-900 dark:text-zinc-100"
             />
           </label>
           <label className="space-y-1 text-xs">
-            <span className="text-zinc-400">% Masse grasse (opt.)</span>
+            <span className="text-zinc-500 dark:text-zinc-400">% Masse grasse (opt.)</span>
             <input
               type="number"
               step="0.5"
@@ -151,17 +154,17 @@ export function GoalsTdeeView({
                   bodyFatPct: e.target.value ? Number(e.target.value) : undefined,
                 })
               }
-              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-2.5 py-2 font-mono"
+              className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 px-2.5 py-2 font-mono text-zinc-900 dark:text-zinc-100"
             />
           </label>
         </div>
 
         <label className="block space-y-1 text-xs">
-          <span className="text-zinc-400">Niveau d&apos;activité</span>
+          <span className="text-zinc-500 dark:text-zinc-400">Niveau d&apos;activité</span>
           <select
             value={profile.activityLevel}
             onChange={(e) => onUpdateProfile({ activityLevel: e.target.value as ActivityLevel })}
-            className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2"
+            className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100"
           >
             {ACTIVITY_LABELS.map((a) => (
               <option key={a.value} value={a.value}>
@@ -172,26 +175,26 @@ export function GoalsTdeeView({
         </label>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="rounded-2xl bg-zinc-950 border border-zinc-800 p-3.5">
-            <p className="text-xs text-zinc-400">BMR (Mifflin / Katch)</p>
+          <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-3.5">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">BMR (Mifflin / Katch)</p>
             <p className="text-lg font-bold font-mono mt-0.5">
               {tdee.bmrMifflin} kcal
               {tdee.bmrKatch ? (
-                <span className="text-xs text-zinc-400 font-normal"> / {tdee.bmrKatch}</span>
+                <span className="text-xs text-zinc-500 dark:text-zinc-400 font-normal"> / {tdee.bmrKatch}</span>
               ) : null}
             </p>
           </div>
-          <div className="rounded-2xl bg-zinc-950 border border-zinc-800 p-3.5">
-            <p className="text-xs text-zinc-400">TDEE théorique</p>
-            <p className="text-lg font-bold font-mono text-sky-400 mt-0.5">
+          <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-3.5">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">TDEE théorique</p>
+            <p className="text-lg font-bold font-mono text-sky-600 dark:text-sky-400 mt-0.5">
               {tdee.tdeeTheoretical} kcal
             </p>
           </div>
-          <div className="rounded-2xl bg-zinc-950 border border-emerald-500/30 p-3.5">
-            <p className="text-xs text-zinc-400">
+          <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-emerald-500/30 p-3.5">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
               TDEE adaptatif ({tdee.adaptiveConfidence})
             </p>
-            <p className="text-lg font-bold font-mono text-emerald-400 mt-0.5">
+            <p className="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">
               {tdee.tdeeAdaptive ? `${tdee.tdeeAdaptive} kcal` : "Données insuffisantes"}
             </p>
           </div>
@@ -201,21 +204,21 @@ export function GoalsTdeeView({
           <button
             type="button"
             onClick={() => applyGoalPreset("cut")}
-            className="px-3.5 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-semibold hover:bg-emerald-500/25"
+            className="px-3.5 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold hover:bg-emerald-500/25"
           >
             Appliquer Sèche (-400 kcal)
           </button>
           <button
             type="button"
             onClick={() => applyGoalPreset("maintain")}
-            className="px-3.5 py-2 rounded-xl bg-sky-500/15 border border-sky-500/40 text-sky-300 text-xs font-semibold hover:bg-sky-500/25"
+            className="px-3.5 py-2 rounded-xl bg-sky-500/15 border border-sky-500/40 text-sky-700 dark:text-sky-300 text-xs font-semibold hover:bg-sky-500/25"
           >
             Appliquer Maintenance
           </button>
           <button
             type="button"
             onClick={() => applyGoalPreset("bulk")}
-            className="px-3.5 py-2 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-semibold hover:bg-amber-500/25"
+            className="px-3.5 py-2 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 text-xs font-semibold hover:bg-amber-500/25"
           >
             Appliquer Prise de masse (+250 kcal)
           </button>
@@ -223,7 +226,7 @@ export function GoalsTdeeView({
       </section>
 
       {/* Objectifs précis Kcal, Macros, Pas, Eau */}
-      <section className="rounded-3xl bg-zinc-900/80 border border-zinc-800 p-5 space-y-4">
+      <section className="rounded-3xl bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-semibold text-sm sm:text-base">Objectifs quotidiens précis</h3>
           {(() => {
@@ -236,7 +239,7 @@ export function GoalsTdeeView({
               <button
                 type="button"
                 onClick={() => onUpdateGoals({ targetKcal: macroTotal })}
-                className="px-3 py-1 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-medium hover:bg-blue-500/25"
+                className="px-3 py-1 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-700 dark:text-blue-300 text-xs font-medium hover:bg-blue-500/25"
               >
                 Aligner kcal sur macros ({macroTotal.toLocaleString("fr-FR")} kcal)
               </button>
@@ -257,11 +260,11 @@ export function GoalsTdeeView({
           const diff = goals.targetKcal - macroTotal;
 
           return (
-            <div className="rounded-2xl bg-zinc-950 border border-zinc-800 p-3.5 space-y-2">
+            <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-3.5 space-y-2">
               <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs">
-                <span className="text-zinc-400">
+                <span className="text-zinc-500 dark:text-zinc-400">
                   Remplissage par les macros :{" "}
-                  <strong className="font-mono text-zinc-100">
+                  <strong className="font-mono text-zinc-900 dark:text-zinc-100">
                     {macroTotal.toLocaleString("fr-FR")}
                   </strong>{" "}
                   / {goals.targetKcal.toLocaleString("fr-FR")} kcal
@@ -269,10 +272,10 @@ export function GoalsTdeeView({
                 <span
                   className={`font-mono font-semibold ${
                     diff === 0
-                      ? "text-emerald-400"
+                      ? "text-emerald-600 dark:text-emerald-400"
                       : diff > 0
-                        ? "text-sky-400"
-                        : "text-rose-400"
+                        ? "text-sky-600 dark:text-sky-400"
+                        : "text-rose-600 dark:text-rose-400"
                   }`}
                 >
                   {diff === 0
@@ -283,13 +286,13 @@ export function GoalsTdeeView({
                 </span>
               </div>
 
-              <div className="h-2.5 rounded-full bg-zinc-900 overflow-hidden flex">
+              <div className="h-2.5 rounded-full bg-[var(--track)] overflow-hidden flex">
                 <div className="h-full bg-teal-400 transition-all" style={{ width: `${cPct}%` }} />
                 <div className="h-full bg-purple-400 transition-all" style={{ width: `${fPct}%` }} />
                 <div className="h-full bg-amber-400 transition-all" style={{ width: `${pPct}%` }} />
               </div>
 
-              <div className="flex flex-wrap gap-3 text-[11px] text-zinc-400">
+              <div className="flex flex-wrap gap-3 text-[11px] text-zinc-500 dark:text-zinc-400">
                 <span className="inline-flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-teal-400" /> Glucides {cKcal} kcal
                 </span>
@@ -306,65 +309,65 @@ export function GoalsTdeeView({
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
           <label className="space-y-1">
-            <span className="text-zinc-400">Calories cibles (kcal)</span>
+            <span className="text-zinc-500 dark:text-zinc-400">Calories cibles (kcal)</span>
             <NumberInput
               min={500}
               value={goals.targetKcal}
               onValueChange={(targetKcal) => onUpdateGoals({ targetKcal })}
-              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 font-mono text-emerald-400 font-semibold"
+              className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 px-3 py-2 font-mono text-emerald-600 dark:text-emerald-400 font-semibold"
             />
           </label>
           <label className="space-y-1">
-            <span className="text-zinc-400">Protéines (g)</span>
+            <span className="text-zinc-500 dark:text-zinc-400">Protéines (g)</span>
             <NumberInput
               min={0}
               value={goals.proteinG}
               onValueChange={(proteinG) => onUpdateGoals({ proteinG })}
-              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 font-mono"
+              className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 px-3 py-2 font-mono text-zinc-900 dark:text-zinc-100"
             />
           </label>
           <label className="space-y-1">
-            <span className="text-zinc-400">Glucides (g)</span>
+            <span className="text-zinc-500 dark:text-zinc-400">Glucides (g)</span>
             <NumberInput
               min={0}
               value={goals.carbsG}
               onValueChange={(carbsG) => onUpdateGoals({ carbsG })}
-              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 font-mono"
+              className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 px-3 py-2 font-mono text-zinc-900 dark:text-zinc-100"
             />
           </label>
           <label className="space-y-1">
-            <span className="text-zinc-400">Lipides (g)</span>
+            <span className="text-zinc-500 dark:text-zinc-400">Lipides (g)</span>
             <NumberInput
               min={0}
               value={goals.fatG}
               onValueChange={(fatG) => onUpdateGoals({ fatG })}
-              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 font-mono"
+              className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 px-3 py-2 font-mono text-zinc-900 dark:text-zinc-100"
             />
           </label>
           <label className="space-y-1">
-            <span className="text-zinc-400">Objectif Pas</span>
+            <span className="text-zinc-500 dark:text-zinc-400">Objectif Pas</span>
             <NumberInput
               min={0}
               step="500"
               value={goals.targetSteps}
               onValueChange={(targetSteps) => onUpdateGoals({ targetSteps })}
-              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 font-mono"
+              className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 px-3 py-2 font-mono text-zinc-900 dark:text-zinc-100"
             />
           </label>
           <label className="space-y-1">
-            <span className="text-zinc-400">Hydratation (ml)</span>
+            <span className="text-zinc-500 dark:text-zinc-400">Hydratation (ml)</span>
             <NumberInput
               min={0}
               step="100"
               value={goals.targetWaterMl}
               onValueChange={(targetWaterMl) => onUpdateGoals({ targetWaterMl })}
-              className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 font-mono"
+              className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 px-3 py-2 font-mono text-zinc-900 dark:text-zinc-100"
             />
           </label>
         </div>
 
         <label className="block space-y-1 text-xs max-w-xs">
-          <span className="text-zinc-400">Seuil de maintenance poids (kg / semaine)</span>
+          <span className="text-zinc-500 dark:text-zinc-400">Seuil de maintenance poids (kg / semaine)</span>
           <NumberInput
             min={0.01}
             step="0.05"
@@ -372,13 +375,13 @@ export function GoalsTdeeView({
             onValueChange={(weightTrendThresholdKgWeek) =>
               onUpdateProfile({ weightTrendThresholdKgWeek })
             }
-            className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3 py-2 font-mono"
+            className="w-full rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 px-3 py-2 font-mono text-zinc-900 dark:text-zinc-100"
           />
         </label>
       </section>
 
       {/* Micronutriments épinglés */}
-      <section className="rounded-3xl bg-zinc-900/80 border border-zinc-800 p-5 space-y-3">
+      <section className="rounded-3xl bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none p-5 space-y-3">
         <h3 className="font-semibold text-sm sm:text-base">Micronutriments épinglés & cibles</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {MICRONUTRIENT_CATALOG.map((meta) => {
@@ -387,7 +390,7 @@ export function GoalsTdeeView({
             return (
               <div
                 key={meta.key}
-                className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-zinc-950 border border-zinc-800 text-xs"
+                className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
               >
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -403,7 +406,7 @@ export function GoalsTdeeView({
                     min={0}
                     value={target}
                     onValueChange={(val) => updateMicroTarget(meta.key, val)}
-                    className="w-20 rounded-lg bg-zinc-900 border border-zinc-800 px-2 py-1 text-right font-mono"
+                    className="w-20 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 px-2 py-1 text-right font-mono text-zinc-900 dark:text-zinc-100"
                   />
                   <span className="text-zinc-500 w-7">{meta.unit}</span>
                 </div>
@@ -414,25 +417,45 @@ export function GoalsTdeeView({
       </section>
 
       {/* Export & Données */}
-      <section className="rounded-3xl bg-zinc-900/80 border border-zinc-800 p-5 flex flex-wrap items-center justify-between gap-3">
+      <section className="rounded-3xl bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 shadow-sm dark:shadow-none p-5 flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-0.5">
           <h3 className="font-semibold text-sm">Sauvegarde & Export</h3>
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
             Tes données restent accessibles hors-ligne et exportables à tout moment.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                onImportJSON(file);
+              }
+              e.target.value = "";
+            }}
+          />
           <button
             type="button"
             onClick={onExportJSON}
-            className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-medium"
+            className="px-3.5 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-100 text-xs font-medium"
           >
             Export JSON
           </button>
           <button
             type="button"
+            onClick={() => importInputRef.current?.click()}
+            className="px-3.5 py-2 rounded-xl bg-emerald-500/15 dark:bg-emerald-500/20 border border-emerald-500/30 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 dark:hover:bg-emerald-500/30 text-xs font-semibold"
+          >
+            Importer JSON
+          </button>
+          <button
+            type="button"
             onClick={onExportCSV}
-            className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-medium"
+            className="px-3.5 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-100 text-xs font-medium"
           >
             Export CSV repas
           </button>
@@ -443,14 +466,14 @@ export function GoalsTdeeView({
                 onClearAllData();
               }
             }}
-            className="px-3.5 py-2 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-semibold hover:bg-rose-500/30"
+            className="px-3.5 py-2 rounded-xl bg-rose-500/10 dark:bg-rose-500/20 border border-rose-500/30 dark:border-rose-500/40 text-rose-600 dark:text-rose-300 text-xs font-semibold hover:bg-rose-500/20 dark:hover:bg-rose-500/30"
           >
             Effacer toutes les données
           </button>
           <button
             type="button"
             onClick={onResetDemo}
-            className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium"
+            className="px-3.5 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-medium"
           >
             Charger démo
           </button>

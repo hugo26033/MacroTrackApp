@@ -31,7 +31,6 @@ export const EMPTY_APP_STATE: AppState = {
     heightCm: 178,
     activityLevel: "moderate",
     theme: "dark",
-    fastingTargetHours: 16,
     weightTrendThresholdKgWeek: 0.15,
     adaptiveTdeeEnabled: true,
     pinnedMicronutrients: ["fiber_g", "sugar_g", "saturated_fat_g", "sodium_mg"],
@@ -73,7 +72,6 @@ export function createInitialDemoState(): AppState {
     activityLevel: "moderate",
     bodyFatPct: 15.5,
     theme: "dark",
-    fastingTargetHours: 16,
     weightTrendThresholdKgWeek: 0.15,
     adaptiveTdeeEnabled: true,
     pinnedMicronutrients: [
@@ -213,7 +211,7 @@ export function createInitialDemoState(): AppState {
     const date = daysAgoISO(13 - idx);
     const isToday = idx === 13;
 
-    // Premier repas vers 12:15 (jeûne ~16h depuis la veille 20:00)
+    // Premier repas vers 12:15
     foodLogs.push({
       id: `demo-${date}-lunch`,
       logDate: date,
@@ -325,13 +323,134 @@ export function loadAppState(): AppState {
   }
 }
 
-export function saveAppState(state: AppState): void {
-  if (typeof window === "undefined") return;
+export type SaveStateResult =
+  | { ok: true }
+  | { ok: false; quotaExceeded: boolean; message: string };
+
+export function saveAppState(state: AppState): SaveStateResult {
+  if (typeof window === "undefined") return { ok: true };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // ignore storage quota errors
+    return { ok: true };
+  } catch (err) {
+    const quotaExceeded =
+      err instanceof DOMException &&
+      (err.name === "QuotaExceededError" ||
+        err.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+        err.code === 22 ||
+        err.code === 1014);
+    return {
+      ok: false,
+      quotaExceeded,
+      message: quotaExceeded
+        ? "Espace de stockage local saturé : impossible d'enregistrer les dernières modifications. Exporte une sauvegarde JSON et libère de l'espace."
+        : "Impossible d'enregistrer les données localement (stockage bloqué ou navigation privée).",
+    };
   }
+}
+
+export type ImportAppStateResult =
+  | {
+      ok: true;
+      state: AppState;
+      summary: {
+        foodLogs: number;
+        foods: number;
+        recipes: number;
+        weights: number;
+        steps: number;
+      };
+    }
+  | { ok: false; error: string };
+
+function isPlainObject(val: unknown): val is Record<string, unknown> {
+  return typeof val === "object" && val !== null && !Array.isArray(val);
+}
+
+export function parseImportedAppState(raw: string): ImportAppStateResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: "Le fichier n'est pas un JSON valide." };
+  }
+
+  if (!isPlainObject(parsed)) {
+    return { ok: false, error: "Format de sauvegarde invalide (objet JSON attendu)." };
+  }
+
+  if (!isPlainObject(parsed.profile) || !isPlainObject(parsed.goals)) {
+    return {
+      ok: false,
+      error: "Ce fichier ne semble pas être une sauvegarde MacroPulse (profil ou objectifs manquants).",
+    };
+  }
+
+  const arrayFields = ["foods", "recipes", "foodLogs", "weights", "steps", "waterLogs"] as const;
+  for (const field of arrayFields) {
+    if (parsed[field] !== undefined && !Array.isArray(parsed[field])) {
+      return {
+        ok: false,
+        error: `Champ "${field}" invalide dans la sauvegarde (liste attendue).`,
+      };
+    }
+  }
+
+  if (!Array.isArray(parsed.foodLogs)) {
+    return {
+      ok: false,
+      error: "Champ \"foodLogs\" manquant dans la sauvegarde MacroPulse.",
+    };
+  }
+
+  if (parsed.dailyNotes !== undefined && !isPlainObject(parsed.dailyNotes)) {
+    return {
+      ok: false,
+      error: "Champ \"dailyNotes\" invalide dans la sauvegarde.",
+    };
+  }
+
+  const profile: UserProfile = {
+    ...EMPTY_APP_STATE.profile,
+    ...(parsed.profile as Partial<UserProfile>),
+    pinnedMicronutrients: Array.isArray(parsed.profile.pinnedMicronutrients)
+      ? (parsed.profile.pinnedMicronutrients as UserProfile["pinnedMicronutrients"])
+      : EMPTY_APP_STATE.profile.pinnedMicronutrients,
+  };
+
+  const goals: NutritionGoals = {
+    ...EMPTY_APP_STATE.goals,
+    ...(parsed.goals as Partial<NutritionGoals>),
+    micronutrientTargets: isPlainObject(parsed.goals.micronutrientTargets)
+      ? (parsed.goals.micronutrientTargets as NutritionGoals["micronutrientTargets"])
+      : EMPTY_APP_STATE.goals.micronutrientTargets,
+  };
+
+  const state: AppState = {
+    profile,
+    goals,
+    foods: (parsed.foods as FoodItem[] | undefined) ?? [],
+    recipes: (parsed.recipes as Recipe[] | undefined) ?? [],
+    foodLogs: parsed.foodLogs as FoodLogEntry[],
+    weights: (parsed.weights as WeightEntry[] | undefined) ?? [],
+    steps: (parsed.steps as StepEntry[] | undefined) ?? [],
+    waterLogs: (parsed.waterLogs as WaterEntry[] | undefined) ?? [],
+    ...(parsed.dailyNotes
+      ? { dailyNotes: parsed.dailyNotes as Record<string, string> }
+      : {}),
+  };
+
+  return {
+    ok: true,
+    state,
+    summary: {
+      foodLogs: state.foodLogs.length,
+      foods: state.foods.length,
+      recipes: state.recipes.length,
+      weights: state.weights.length,
+      steps: state.steps.length,
+    },
+  };
 }
 
 export function exportAppStateAsJSON(state: AppState): string {

@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useRef } from "react";
 import type { WeightEntry } from "@/lib/types";
+import { useModalEffects } from "@/lib/useModalEffects";
 import {
   ChartIcon,
   ChevronRightIcon,
@@ -25,6 +26,7 @@ interface ProfileMenuModalProps {
   onNavigate: (tab: "goals" | "analytics") => void;
   onOpenFoods: () => void;
   onExportJSON: () => void;
+  onImportJSON: (file: File) => void;
   onExportCSV: () => void;
   onClearAllData: () => void;
 }
@@ -40,9 +42,13 @@ export function ProfileMenuModal({
   onNavigate,
   onOpenFoods,
   onExportJSON,
+  onImportJSON,
   onExportCSV,
   onClearAllData,
 }: ProfileMenuModalProps) {
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  useModalEffects(open, onClose);
+
   if (!open) return null;
 
   const sortedWeights = [...weights].sort((a, b) => a.logDate.localeCompare(b.logDate));
@@ -55,15 +61,15 @@ export function ProfileMenuModal({
     sortedWeights.length < 2
       ? "—"
       : weightDiff >= 0
-        ? `${weightDiff.toFixed(1)} kg`
-        : `+${Math.abs(weightDiff).toFixed(1)} kg`;
+        ? `${weightDiff.toFixed(1).replace(".", ",")} kg`
+        : `+${Math.abs(weightDiff).toFixed(1).replace(".", ",")} kg`;
 
   const weightSublabel =
     sortedWeights.length < 2
       ? "aucune pesée"
       : weightDiff >= 0
-        ? "kg perdus"
-        : "kg pris";
+        ? "perdus"
+        : "pris";
 
   const initial = (displayName || "U").trim().charAt(0).toUpperCase();
 
@@ -73,7 +79,7 @@ export function ProfileMenuModal({
         isDark ? "bg-[#0f131d] text-zinc-100" : "bg-zinc-100 text-zinc-900"
       }`}
     >
-      <div className="max-w-xl mx-auto px-4 pt-4 pb-12 space-y-5">
+      <div className="max-w-xl mx-auto px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(3rem+env(safe-area-inset-bottom))] space-y-5">
         {/* Top bar with X */}
         <div className="flex justify-end">
           <button
@@ -113,13 +119,13 @@ export function ProfileMenuModal({
           <div className="flex items-center gap-5 shrink-0">
             <div className="text-center">
               <div className="text-sm font-bold font-mono">{streakCount}</div>
-              <div className="text-[11px] text-zinc-400">D&apos;affilée</div>
+              <div className="text-[11px] text-zinc-500 dark:text-zinc-400">D&apos;affilée</div>
             </div>
             <div className="text-center">
               <div className="text-sm font-bold font-mono">{weightLabel}</div>
-              <div className="text-[11px] text-zinc-400">{weightSublabel}</div>
+              <div className="text-[11px] text-zinc-500 dark:text-zinc-400">{weightSublabel}</div>
             </div>
-            <ChevronRightIcon className="w-4 h-4 text-zinc-500" />
+            <ChevronRightIcon className="w-4 h-4 text-zinc-400 dark:text-zinc-500" />
           </div>
         </button>
 
@@ -137,7 +143,7 @@ export function ProfileMenuModal({
               onNavigate("goals");
               onClose();
             }}
-            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02]"
+            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-zinc-50 dark:hover:bg-white/[0.02]"
           >
             <div className="flex items-center gap-3">
               <ChartIcon className="w-5 h-5 text-zinc-400" />
@@ -152,7 +158,7 @@ export function ProfileMenuModal({
               onNavigate("analytics");
               onClose();
             }}
-            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02]"
+            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-zinc-50 dark:hover:bg-white/[0.02]"
           >
             <div className="flex items-center gap-3">
               <ScaleIcon className="w-5 h-5 text-zinc-400" />
@@ -167,7 +173,7 @@ export function ProfileMenuModal({
               onOpenFoods();
               onClose();
             }}
-            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02]"
+            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-zinc-50 dark:hover:bg-white/[0.02]"
           >
             <div className="flex items-center gap-3">
               <SearchIcon className="w-5 h-5 text-zinc-400" />
@@ -191,7 +197,7 @@ export function ProfileMenuModal({
               onNavigate("analytics");
               onClose();
             }}
-            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02]"
+            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-zinc-50 dark:hover:bg-white/[0.02]"
           >
             <div className="flex items-center gap-3">
               <FootprintsIcon className="w-5 h-5 text-zinc-400" />
@@ -212,7 +218,7 @@ export function ProfileMenuModal({
           <button
             type="button"
             onClick={onToggleTheme}
-            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02]"
+            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-zinc-50 dark:hover:bg-white/[0.02]"
           >
             <div className="flex items-center gap-3">
               {isDark ? (
@@ -230,16 +236,39 @@ export function ProfileMenuModal({
           <button
             type="button"
             onClick={onExportJSON}
-            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02]"
+            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-zinc-50 dark:hover:bg-white/[0.02]"
           >
             <span className="text-sm font-medium">Exporter toutes les données (JSON)</span>
             <ChevronRightIcon className="w-4 h-4 text-zinc-500" />
           </button>
 
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                onImportJSON(file);
+                onClose();
+              }
+              e.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => importInputRef.current?.click()}
+            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/5"
+          >
+            <span className="text-sm font-medium">Importer / Restaurer une sauvegarde (JSON)</span>
+            <ChevronRightIcon className="w-4 h-4 text-emerald-500/70 dark:text-emerald-400/70" />
+          </button>
+
           <button
             type="button"
             onClick={onExportCSV}
-            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02]"
+            className="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-zinc-50 dark:hover:bg-white/[0.02]"
           >
             <span className="text-sm font-medium">Exporter le journal repas (CSV)</span>
             <ChevronRightIcon className="w-4 h-4 text-zinc-500" />

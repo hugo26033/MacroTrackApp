@@ -5,6 +5,7 @@ import {
   aggregateSeriesByRange,
   analyzeWeightTrends,
   computeWeightSeriesWithTrends,
+  formatFrNumber,
   parseStepsImportText,
   prevDateISO,
 } from "@/lib/calculations";
@@ -17,7 +18,8 @@ import type {
   WeightEntry,
 } from "@/lib/types";
 import { BarHistoryChart, WeightTrendChart } from "./Charts";
-import { ChartIcon, PlusIcon, TrashIcon, XIcon } from "./Icons";
+import { CalendarIcon, ChartIcon, PlusIcon, ShareIcon, TrashIcon, XIcon } from "./Icons";
+import { useModalEffects } from "@/lib/useModalEffects";
 
 interface AnalyticsViewProps {
   weights: WeightEntry[];
@@ -36,9 +38,9 @@ interface AnalyticsViewProps {
 type MetricView = "weight" | "kcal" | "steps";
 
 const TREND_BADGE: Record<TrendDirection, { label: string; cls: string }> = {
-  baisse: { label: "Baisse", cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
-  maintenance: { label: "Maintenance", cls: "bg-sky-500/15 text-sky-400 border-sky-500/30" },
-  hausse: { label: "Hausse", cls: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
+  baisse: { label: "Baisse", cls: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30" },
+  maintenance: { label: "Maintenance", cls: "bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/30" },
+  hausse: { label: "Hausse", cls: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30" },
 };
 
 const RANGE_LABELS: Record<ChartRange, string> = {
@@ -92,6 +94,9 @@ export function AnalyticsView({
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [importStatus, setImportStatus] = useState<string | null>(null);
+
+  useModalEffects(weightModalOpen, () => setWeightModalOpen(false));
+  useModalEffects(stepsModalOpen, () => setStepsModalOpen(false));
 
   const daysLimit = range === "week" ? 7 : range === "month" ? 30 : 365;
   const fullWeightSeries = computeWeightSeriesWithTrends(weights);
@@ -248,7 +253,7 @@ export function AnalyticsView({
         <button
           type="button"
           onClick={onBack}
-          className="w-10 h-10 rounded-full bg-[#1a2030] border border-white/10 flex items-center justify-center text-zinc-200 hover:bg-[#232a3e] transition active:scale-95"
+          className="w-11 h-11 rounded-full bg-white dark:bg-[#1a2030] border border-zinc-200 dark:border-white/10 flex items-center justify-center text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-[#232a3e] transition active:scale-95"
           aria-label="Retour"
         >
           ←
@@ -256,20 +261,22 @@ export function AnalyticsView({
 
         <h2 className="text-base font-semibold tracking-tight">Mesures</h2>
 
-        <div className="inline-flex items-center rounded-full bg-[#1a2030] border border-white/10 p-1 gap-1">
+        <div className="inline-flex items-center rounded-full bg-white dark:bg-[#1a2030] border border-zinc-200 dark:border-white/10 p-0.5 gap-0.5">
           <button
             type="button"
             onClick={exportActiveCSV}
-            className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-zinc-300 text-xs"
+            className="w-11 h-11 rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 flex items-center justify-center text-zinc-600 dark:text-zinc-300"
             title="Exporter en CSV"
+            aria-label="Exporter en CSV"
           >
-            📤
+            <ShareIcon className="w-4 h-4" />
           </button>
           <button
             type="button"
             onClick={handleTopPlusClick}
-            className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-zinc-100"
+            className="w-11 h-11 rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 flex items-center justify-center text-zinc-800 dark:text-zinc-100"
             title={metric === "steps" ? "Ajouter des pas" : "Ajouter une pesée"}
+            aria-label={metric === "steps" ? "Ajouter des pas" : "Ajouter une pesée"}
           >
             <PlusIcon className="w-4 h-4" />
           </button>
@@ -277,23 +284,25 @@ export function AnalyticsView({
       </div>
 
       {/* 2-Column Filter Bar (Poids / Calories / Pas | 1 semaine / 1 mois / 1 an) */}
-      <div className="grid grid-cols-2 border-y border-white/[0.06] py-2.5 text-sm">
+      <div className="grid grid-cols-2 border-y border-zinc-200 dark:border-white/[0.06] py-1 text-sm">
         <button
           type="button"
           onClick={cycleMetric}
-          className="flex items-center justify-between px-2 pr-4 border-r border-white/[0.06] hover:opacity-85 transition"
+          aria-label={`Métrique : ${METRIC_LABELS[metric]}`}
+          className="min-h-11 flex items-center justify-between px-2 pr-4 border-r border-zinc-200 dark:border-white/[0.06] hover:opacity-85 transition"
         >
-          <ChartIcon className="w-4 h-4 text-zinc-400" />
-          <span className="font-medium text-blue-400">{METRIC_LABELS[metric]}</span>
+          <ChartIcon className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+          <span className="font-medium text-blue-600 dark:text-blue-400">{METRIC_LABELS[metric]}</span>
         </button>
 
         <button
           type="button"
           onClick={cycleRange}
-          className="flex items-center justify-between px-2 pl-4 hover:opacity-85 transition"
+          aria-label={`Période : ${RANGE_LABELS[range]}`}
+          className="min-h-11 flex items-center justify-between px-2 pl-4 hover:opacity-85 transition"
         >
-          <span className="text-zinc-400 text-xs">📅</span>
-          <span className="font-medium text-blue-400">{RANGE_LABELS[range]}</span>
+          <CalendarIcon className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+          <span className="font-medium text-blue-600 dark:text-blue-400">{RANGE_LABELS[range]}</span>
         </button>
       </div>
 
@@ -303,14 +312,14 @@ export function AnalyticsView({
           <div className="grid grid-cols-3 gap-2 pt-1 pb-2">
             <div>
               <p className="text-lg font-bold font-mono">
-                {startWeight !== null ? `${startWeight.toString().replace(".", ",")} kg` : "—"}
+                {startWeight !== null ? `${formatFrNumber(startWeight)} kg` : "—"}
               </p>
               <p className="text-[11px] text-zinc-500 uppercase tracking-wider">DÉBUT</p>
             </div>
 
             <div>
               <p className="text-lg font-bold font-mono">
-                {currentWeight !== null ? `${currentWeight.toString().replace(".", ",")} kg` : "—"}
+                {currentWeight !== null ? `${formatFrNumber(currentWeight)} kg` : "—"}
               </p>
               <p className="text-[11px] text-zinc-500 uppercase tracking-wider">ACTUEL</p>
             </div>
@@ -319,34 +328,36 @@ export function AnalyticsView({
               <p className="text-lg font-bold font-mono inline-flex items-center gap-1">
                 {weightDelta !== null ? (
                   <>
-                    <span className={weightDelta <= 0 ? "text-emerald-400" : "text-amber-400"}>
+                    <span className={weightDelta <= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
                       {weightDelta <= 0 ? "↘" : "↗"}
                     </span>
-                    <span>{Math.abs(weightDelta).toString().replace(".", ",")} kg</span>
+                    <span>{formatFrNumber(Math.abs(weightDelta))} kg</span>
                   </>
                 ) : (
                   "—"
                 )}
               </p>
               <p className="text-[11px] text-zinc-500 uppercase tracking-wider">
-                MODIFIER{" "}
-                {weightPct !== null ? `(${weightPct > 0 ? "+" : ""}${weightPct}%)` : ""}
+                VARIATION{" "}
+                {weightPct !== null
+                  ? `(${weightPct > 0 ? "+" : ""}${formatFrNumber(weightPct)} %)`
+                  : ""}
               </p>
             </div>
           </div>
 
-          <section className="rounded-2xl bg-gradient-to-b from-[#1a2030] to-[#141824] border border-white/[0.07] p-4 space-y-4">
+          <section className="rounded-2xl bg-white dark:bg-gradient-to-b dark:from-[#1a2030] dark:to-[#141824] border border-zinc-200 dark:border-white/[0.07] shadow-sm dark:shadow-none p-4 space-y-4">
             <WeightTrendChart
               data={visibleWeightSeries}
               prevDayKcalByDate={prevDayKcalByWeightDate}
             />
 
-            <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-white/[0.06]">
+            <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-zinc-200 dark:border-white/[0.06]">
               <div className="flex items-center justify-between text-xs">
                 <div>
-                  <span className="text-zinc-400">Tendance 3j : </span>
+                  <span className="text-zinc-500 dark:text-zinc-400">Tendance 3j : </span>
                   <strong className="font-mono">
-                    {trendAnalysis.ma3Latest !== null ? `${trendAnalysis.ma3Latest} kg` : "—"}
+                    {trendAnalysis.ma3Latest !== null ? `${formatFrNumber(trendAnalysis.ma3Latest)} kg` : "—"}
                   </strong>
                 </div>
                 <span
@@ -360,9 +371,9 @@ export function AnalyticsView({
 
               <div className="flex items-center justify-between text-xs">
                 <div>
-                  <span className="text-zinc-400">Tendance 5j : </span>
+                  <span className="text-zinc-500 dark:text-zinc-400">Tendance 5j : </span>
                   <strong className="font-mono">
-                    {trendAnalysis.ma5Latest !== null ? `${trendAnalysis.ma5Latest} kg` : "—"}
+                    {trendAnalysis.ma5Latest !== null ? `${formatFrNumber(trendAnalysis.ma5Latest)} kg` : "—"}
                   </strong>
                 </div>
                 <span
@@ -385,7 +396,7 @@ export function AnalyticsView({
                   setWeightDate(selectedDate);
                   setWeightModalOpen(true);
                 }}
-                className="text-xs text-blue-400 font-medium hover:underline"
+                className="text-xs text-blue-600 dark:text-blue-400 font-medium hover:underline"
               >
                 + Ajouter une pesée
               </button>
@@ -396,7 +407,7 @@ export function AnalyticsView({
                 Aucune pesée enregistrée. Clique sur + en haut à droite pour commencer.
               </p>
             ) : (
-              <div className="divide-y divide-white/[0.06]">
+              <div className="divide-y divide-zinc-200 dark:divide-white/[0.06]">
                 {sortedWeightsDesc.map((entry) => {
                   const prevKcal = prevDayKcalByWeightDate[entry.logDate];
                   return (
@@ -407,20 +418,20 @@ export function AnalyticsView({
                       setWeightInput(String(entry.weightKg));
                       setWeightModalOpen(true);
                     }}
-                    className="cursor-pointer py-3 flex items-center justify-between gap-3 hover:bg-white/[0.02] px-1 rounded-xl transition"
+                    className="cursor-pointer py-3 flex items-center justify-between gap-3 hover:bg-zinc-200/50 dark:hover:bg-white/[0.02] px-1 rounded-xl transition"
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold font-mono text-zinc-100">
+                        <p className="text-sm font-bold font-mono text-zinc-900 dark:text-zinc-100">
                           {entry.weightKg.toString().replace(".", ",")} kg
                         </p>
                         {prevKcal !== undefined && (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[11px] font-mono text-amber-300">
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-[11px] font-mono text-amber-700 dark:text-amber-300">
                             Veille : {prevKcal.toLocaleString("fr-FR")} cal
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-zinc-400 capitalize">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">
                         {formatFullFrenchDate(entry.logDate)}
                       </p>
                     </div>
@@ -431,7 +442,7 @@ export function AnalyticsView({
                           e.stopPropagation();
                           onDeleteWeight(entry.logDate);
                         }}
-                        className="p-2 text-zinc-500 hover:text-rose-400"
+                        className="p-2 text-zinc-400 dark:text-zinc-500 hover:text-rose-500 dark:hover:text-rose-400"
                         title="Supprimer cette pesée"
                       >
                         <TrashIcon />
@@ -465,14 +476,14 @@ export function AnalyticsView({
             </div>
 
             <div>
-              <p className="text-lg font-bold font-mono text-emerald-400">
+              <p className="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400">
                 {goals.targetKcal.toLocaleString("fr-FR")} cal
               </p>
               <p className="text-[11px] text-zinc-500 uppercase tracking-wider">OBJECTIF</p>
             </div>
           </div>
 
-          <section className="rounded-2xl bg-gradient-to-b from-[#1a2030] to-[#141824] border border-white/[0.07] p-4 space-y-3">
+          <section className="rounded-2xl bg-white dark:bg-gradient-to-b dark:from-[#1a2030] dark:to-[#141824] border border-zinc-200 dark:border-white/[0.07] shadow-sm dark:shadow-none p-4 space-y-3">
             <BarHistoryChart
               data={kcalSeries}
               target={goals.targetKcal}
@@ -488,7 +499,7 @@ export function AnalyticsView({
                 Aucune calorie enregistrée pour le moment.
               </p>
             ) : (
-              <div className="divide-y divide-white/[0.06]">
+              <div className="divide-y divide-zinc-200 dark:divide-white/[0.06]">
                 {kcalEntriesAll.slice(0, 30).map((entry) => {
                   const delta = entry.kcal - goals.targetKcal;
                   return (
@@ -497,16 +508,16 @@ export function AnalyticsView({
                       className="py-3 flex items-center justify-between gap-3 px-1"
                     >
                       <div>
-                        <p className="text-sm font-bold font-mono text-zinc-100">
+                        <p className="text-sm font-bold font-mono text-zinc-900 dark:text-zinc-100">
                           {entry.kcal.toLocaleString("fr-FR")} cal
                         </p>
-                        <p className="text-xs text-zinc-400 capitalize">
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">
                           {formatFullFrenchDate(entry.date)}
                         </p>
                       </div>
                       <span
                         className={`text-xs font-mono font-medium ${
-                          delta <= 0 ? "text-emerald-400" : "text-amber-400"
+                          delta <= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
                         }`}
                       >
                         {delta > 0 ? `+${delta}` : delta} cal
@@ -539,14 +550,14 @@ export function AnalyticsView({
             </div>
 
             <div>
-              <p className="text-lg font-bold font-mono text-sky-400">
+              <p className="text-lg font-bold font-mono text-sky-600 dark:text-sky-400">
                 {goals.targetSteps.toLocaleString("fr-FR")}
               </p>
               <p className="text-[11px] text-zinc-500 uppercase tracking-wider">OBJECTIF</p>
             </div>
           </div>
 
-          <section className="rounded-2xl bg-gradient-to-b from-[#1a2030] to-[#141824] border border-white/[0.07] p-4 space-y-3">
+          <section className="rounded-2xl bg-white dark:bg-gradient-to-b dark:from-[#1a2030] dark:to-[#141824] border border-zinc-200 dark:border-white/[0.07] shadow-sm dark:shadow-none p-4 space-y-3">
             <BarHistoryChart
               data={stepSeries}
               target={goals.targetSteps}
@@ -562,7 +573,7 @@ export function AnalyticsView({
                 <button
                   type="button"
                   onClick={() => setImportOpen((v) => !v)}
-                  className="text-xs text-zinc-400 hover:text-zinc-200"
+                  className="text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
                 >
                   Import CSV/JSON
                 </button>
@@ -573,7 +584,7 @@ export function AnalyticsView({
                     setStepsInput(String(selectedDaySteps || 8500));
                     setStepsModalOpen(true);
                   }}
-                  className="text-xs text-blue-400 font-medium hover:underline"
+                  className="text-xs text-blue-600 dark:text-blue-400 font-medium hover:underline"
                 >
                   + Ajouter des pas
                 </button>
@@ -581,8 +592,8 @@ export function AnalyticsView({
             </div>
 
             {importOpen && (
-              <div className="p-3.5 rounded-2xl bg-[#181d2a] border border-white/10 space-y-2.5">
-                <p className="text-xs text-zinc-400">
+              <div className="p-3.5 rounded-2xl bg-white dark:bg-[#181d2a] border border-zinc-200 dark:border-white/10 space-y-2.5">
+                <p className="text-xs text-zinc-600 dark:text-zinc-400">
                   Colle un export CSV (<code>2026-11-15,9800</code>) ou JSON (Apple Santé / Google Takeout) :
                 </p>
                 <textarea
@@ -590,17 +601,17 @@ export function AnalyticsView({
                   value={importText}
                   onChange={(e) => setImportText(e.target.value)}
                   placeholder={"2026-11-14,10450\n2026-11-15,9820"}
-                  className="w-full rounded-xl bg-[#0f131d] border border-white/10 p-2.5 text-xs font-mono"
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-[#0f131d] border border-zinc-300 dark:border-white/10 p-2.5 text-xs font-mono text-zinc-900 dark:text-zinc-100"
                 />
                 <div className="flex items-center justify-between gap-2">
                   <button
                     type="button"
                     onClick={handleRunImport}
-                    className="px-3.5 py-1.5 rounded-xl bg-sky-500 text-zinc-950 text-xs font-semibold"
+                    className="px-3.5 py-1.5 rounded-xl bg-sky-500 text-white dark:text-zinc-950 text-xs font-semibold"
                   >
                     Importer les pas
                   </button>
-                  {importStatus && <span className="text-xs text-emerald-400">{importStatus}</span>}
+                  {importStatus && <span className="text-xs text-emerald-600 dark:text-emerald-400">{importStatus}</span>}
                 </div>
               </div>
             )}
@@ -610,7 +621,7 @@ export function AnalyticsView({
                 Aucun pas enregistré. Clique sur + en haut à droite pour ajouter une journée.
               </p>
             ) : (
-              <div className="divide-y divide-white/[0.06]">
+              <div className="divide-y divide-zinc-200 dark:divide-white/[0.06]">
                 {sortedStepsDesc.map((entry) => (
                   <div
                     key={entry.logDate}
@@ -619,19 +630,19 @@ export function AnalyticsView({
                       setStepsInput(String(entry.steps));
                       setStepsModalOpen(true);
                     }}
-                    className="cursor-pointer py-3 flex items-center justify-between gap-3 hover:bg-white/[0.02] px-1 rounded-xl transition"
+                    className="cursor-pointer py-3 flex items-center justify-between gap-3 hover:bg-zinc-200/50 dark:hover:bg-white/[0.02] px-1 rounded-xl transition"
                   >
                     <div>
-                      <p className="text-sm font-bold font-mono text-zinc-100">
+                      <p className="text-sm font-bold font-mono text-zinc-900 dark:text-zinc-100">
                         {entry.steps.toLocaleString("fr-FR")} pas
                       </p>
-                      <p className="text-xs text-zinc-400 capitalize">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 capitalize">
                         {formatFullFrenchDate(entry.logDate)}
                       </p>
                     </div>
                     <span
                       className={`text-xs font-mono ${
-                        entry.steps >= goals.targetSteps ? "text-emerald-400" : "text-zinc-500"
+                        entry.steps >= goals.targetSteps ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500"
                       }`}
                     >
                       {Math.round((entry.steps / Math.max(1, goals.targetSteps)) * 100)}%
@@ -648,19 +659,19 @@ export function AnalyticsView({
       {weightModalOpen && (
         <div
           onClick={() => setWeightModalOpen(false)}
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-50 bg-black/60 dark:bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
         >
           <form
             onSubmit={handleSaveWeight}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl bg-[#181d2a] border border-white/10 p-5 space-y-4 shadow-2xl"
+            className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl bg-white dark:bg-[#181d2a] border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-zinc-100 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5 space-y-4 shadow-2xl"
           >
             <div className="flex items-center justify-between">
               <h3 className="text-base font-semibold">Enregistrer une pesée</h3>
               <button
                 type="button"
                 onClick={() => setWeightModalOpen(false)}
-                className="p-1.5 rounded-full bg-white/5 text-zinc-400 hover:text-zinc-200"
+                className="p-1.5 rounded-full bg-zinc-100 dark:bg-white/5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
               >
                 <XIcon className="w-4 h-4" />
               </button>
@@ -668,23 +679,23 @@ export function AnalyticsView({
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <label className="space-y-1">
-                <span className="text-zinc-400">Date</span>
+                <span className="text-zinc-500 dark:text-zinc-400">Date</span>
                 <input
                   type="date"
                   value={weightDate}
                   onChange={(e) => setWeightDate(e.target.value)}
-                  className="w-full rounded-xl bg-[#0f131d] border border-white/10 px-3 py-2 font-mono text-zinc-100"
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-[#0f131d] border border-zinc-300 dark:border-white/10 px-3 py-2 font-mono text-zinc-900 dark:text-zinc-100"
                 />
               </label>
               <label className="space-y-1">
-                <span className="text-zinc-400">Poids (kg)</span>
+                <span className="text-zinc-500 dark:text-zinc-400">Poids (kg)</span>
                 <input
                   type="number"
                   step="0.1"
                   required
                   value={weightInput}
                   onChange={(e) => setWeightInput(e.target.value)}
-                  className="w-full rounded-xl bg-[#0f131d] border border-white/10 px-3 py-2 font-mono text-emerald-400 font-bold"
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-[#0f131d] border border-zinc-300 dark:border-white/10 px-3 py-2 font-mono text-emerald-600 dark:text-emerald-400 font-bold"
                 />
               </label>
             </div>
@@ -703,19 +714,19 @@ export function AnalyticsView({
       {stepsModalOpen && (
         <div
           onClick={() => setStepsModalOpen(false)}
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-50 bg-black/60 dark:bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
         >
           <form
             onSubmit={handleSaveSteps}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl bg-[#181d2a] border border-white/10 p-5 space-y-4 shadow-2xl"
+            className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl bg-white dark:bg-[#181d2a] border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-zinc-100 p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5 space-y-4 shadow-2xl"
           >
             <div className="flex items-center justify-between">
               <h3 className="text-base font-semibold">Enregistrer des pas</h3>
               <button
                 type="button"
                 onClick={() => setStepsModalOpen(false)}
-                className="p-1.5 rounded-full bg-white/5 text-zinc-400 hover:text-zinc-200"
+                className="p-1.5 rounded-full bg-zinc-100 dark:bg-white/5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
               >
                 <XIcon className="w-4 h-4" />
               </button>
@@ -723,23 +734,23 @@ export function AnalyticsView({
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <label className="space-y-1">
-                <span className="text-zinc-400">Date</span>
+                <span className="text-zinc-500 dark:text-zinc-400">Date</span>
                 <input
                   type="date"
                   value={stepsDate}
                   onChange={(e) => setStepsDate(e.target.value)}
-                  className="w-full rounded-xl bg-[#0f131d] border border-white/10 px-3 py-2 font-mono text-zinc-100"
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-[#0f131d] border border-zinc-300 dark:border-white/10 px-3 py-2 font-mono text-zinc-900 dark:text-zinc-100"
                 />
               </label>
               <label className="space-y-1">
-                <span className="text-zinc-400">Nombre de pas</span>
+                <span className="text-zinc-500 dark:text-zinc-400">Nombre de pas</span>
                 <input
                   type="number"
                   min={0}
                   required
                   value={stepsInput}
                   onChange={(e) => setStepsInput(e.target.value)}
-                  className="w-full rounded-xl bg-[#0f131d] border border-white/10 px-3 py-2 font-mono text-sky-400 font-bold"
+                  className="w-full rounded-xl bg-zinc-50 dark:bg-[#0f131d] border border-zinc-300 dark:border-white/10 px-3 py-2 font-mono text-sky-600 dark:text-sky-400 font-bold"
                 />
               </label>
             </div>
