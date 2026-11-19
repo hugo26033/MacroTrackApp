@@ -78,6 +78,7 @@ function QuickAddModalContent({
 }: QuickAddModalProps) {
   const [tab, setTab] = useState<QuickAddTabMode>(initialTab);
   const [mealSlot, setMealSlot] = useState<MealSlot>(initialMealSlot);
+  useModalEffects(true, onClose);
   const [searchQuery, setSearchQuery] = useState("");
   const [brandQuery, setBrandQuery] = useState("");
   const [offResults, setOffResults] = useState<FoodItem[]>([]);
@@ -872,8 +873,14 @@ function QuickAddModalContent({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-sm p-0 sm:p-4">
-      <div className="w-full max-w-xl max-h-[94vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[#0f131d] border border-white/10 text-zinc-100 shadow-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5 space-y-4">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-sm p-0 sm:p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-xl max-h-[94vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[#0f131d] border border-white/10 text-zinc-100 shadow-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5 space-y-4"
+      >
         {/* Top Bar: Close + Meal Slot Dropdown */}
         <div className="flex items-center justify-between gap-3">
           <button
@@ -889,7 +896,8 @@ function QuickAddModalContent({
             <select
               value={mealSlot}
               onChange={(e) => setMealSlot(e.target.value as MealSlot)}
-              className="appearance-none bg-transparent pr-6 pl-2 py-1 text-sm font-semibold text-blue-400 focus:outline-none cursor-pointer"
+              style={{ WebkitAppearance: "none", MozAppearance: "none", appearance: "none" }}
+              className="appearance-none bg-transparent bg-none pr-6 pl-2 py-1 text-sm font-semibold text-blue-400 focus:outline-none cursor-pointer"
             >
               {MEAL_SLOTS.map((slot) => (
                 <option key={slot.value} value={slot.value} className="bg-[#181d2a] text-zinc-100">
@@ -897,7 +905,7 @@ function QuickAddModalContent({
                 </option>
               ))}
             </select>
-            <ChevronDownIcon className="w-4 h-4 text-blue-400 pointer-events-none -ml-5" />
+            <ChevronDownIcon className="w-4 h-4 text-blue-400 pointer-events-none absolute right-1" />
           </div>
 
           <span className="text-[11px] font-mono text-zinc-500 min-w-[70px] text-right">

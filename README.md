@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MacroPulse
 
-## Getting Started
+Application web progressive (PWA) mobile-first de suivi nutritionnel, calories, macros, micronutriments, hydratation, pas et tendances de poids.
 
-First, run the development server:
+## Fonctionnalités principales
+
+- **Journal quotidien** : suivi des calories, glucides, lipides, protéines, micronutriments épinglés, eau, pas et notes journalières.
+- **Ajout rapide multi-sources** : recherche locale & Open Food Facts, scan de code-barres (caméra + photo via ZXing WASM local avec fallback Gemini), analyse photo/texte par IA (Gemini), créateur de recettes et saisie manuelle.
+- **Optimiseur de macros** : solveur hybride pour compléter la journée ou planifier ses quantités.
+- **Progression & Objectifs** : courbes de poids avec moyennes mobiles 3j / 5j, corrélation avec les calories de la veille, calcul TDEE adaptatif.
+- **Stockage local-first** : persistance dans `localStorage` avec export CSV et export/import JSON complet.
+
+## Développement local
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Ouvrir [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Variables d'environnement
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `GEMINI_API_KEY` *(optionnelle en local, requise pour les fonctionnalités IA)* : clé API Google Gemini utilisée par les routes `/api/ai/*`.
 
-## Learn More
+## Scripts utiles
 
-To learn more about Next.js, take a look at the following resources:
+- `npm run dev` — serveur de développement Next.js (Turbopack)
+- `npm run lint` — vérification ESLint (React 19 / Next.js)
+- `npm run build` — build de production et vérification TypeScript
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Architecture & Persistance
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+L'application fonctionne actuellement 100 % côté client (`localStorage` via `src/lib/storage.ts`), avec quelques routes API Next.js pour Open Food Facts et Gemini. Le fichier `supabase/schema.sql` est conservé comme schéma SQL de référence pour une éventuelle synchronisation cloud future et n'est pas requis pour exécuter l'application.

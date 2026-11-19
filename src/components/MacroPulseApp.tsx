@@ -50,6 +50,7 @@ import {
   XIcon,
 } from "./Icons";
 import type { QuickAddTabMode } from "./QuickAddModal";
+import { useModalEffects } from "@/lib/useModalEffects";
 
 const AnalyticsView = dynamic(
   () => import("./AnalyticsView").then((m) => m.AnalyticsView),
@@ -171,6 +172,16 @@ function MacroPulseClientApp() {
   }, [toast]);
 
   const isDark = state.profile.theme === "dark";
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDark);
+  }, [isDark]);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeTab]);
+
+  useModalEffects(addSheetOpen, () => setAddSheetOpen(false));
 
   const dayFoodLogs = useMemo(
     () => state.foodLogs.filter((l) => l.logDate === selectedDate),
@@ -549,7 +560,7 @@ function MacroPulseClientApp() {
                     <button
                       type="button"
                       onClick={() => shiftCalMonth(1)}
-                      className="min-w-11 min-h-11 px-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium flex items-center justify-center"
+                      className="min-w-11 min-h-11 px-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-white/5 dark:hover:bg-white/10 text-xs font-medium flex items-center justify-center"
                       aria-label="Mois suivant"
                     >
                       →
@@ -583,15 +594,15 @@ function MacroPulseClientApp() {
                           isSelected
                             ? "bg-blue-500 text-white font-semibold"
                             : isToday
-                              ? "ring-1 ring-blue-400 text-blue-400 hover:bg-white/5"
-                              : "hover:bg-white/5 text-zinc-200"
+                              ? "ring-1 ring-blue-500 dark:ring-blue-400 text-blue-600 dark:text-blue-400 hover:bg-zinc-100 dark:hover:bg-white/5"
+                              : "hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-700 dark:text-zinc-200"
                         }`}
                       >
                         <span>{cell.day}</span>
                         {hasLogs && (
                           <span
                             className={`w-1 h-1 rounded-full mt-0.5 ${
-                              isSelected ? "bg-white" : "bg-emerald-400"
+                              isSelected ? "bg-white" : "bg-emerald-500 dark:bg-emerald-400"
                             }`}
                           />
                         )}
@@ -620,11 +631,13 @@ function MacroPulseClientApp() {
                       key={dayISO}
                       type="button"
                       onClick={() => setSelectedDate(dayISO)}
-                      className="flex flex-col items-center gap-1.5 group"
+                      className="min-h-11 min-w-11 flex flex-col items-center justify-center gap-1.5 group"
                     >
                       <span
                         className={`text-[11px] font-medium ${
-                          isSelected ? "text-white font-bold" : "text-zinc-400"
+                          isSelected
+                            ? "text-zinc-900 dark:text-white font-bold"
+                            : "text-zinc-500 dark:text-zinc-400"
                         }`}
                       >
                         {WEEKDAY_LETTERS[idx]}
@@ -634,10 +647,10 @@ function MacroPulseClientApp() {
                           hasLogs
                             ? isSelected
                               ? "bg-blue-500 text-white ring-2 ring-blue-400/50"
-                              : "bg-zinc-200 text-[#0f131d]"
+                              : "bg-zinc-800 text-white dark:bg-zinc-200 dark:text-[#0f131d]"
                             : isSelected
-                              ? "border-2 border-blue-400 bg-blue-500/15"
-                              : "border border-zinc-600/70 group-hover:border-zinc-400"
+                              ? "border-2 border-blue-500 dark:border-blue-400 bg-blue-500/15"
+                              : "border border-zinc-300 dark:border-zinc-600/70 group-hover:border-zinc-500 dark:group-hover:border-zinc-400"
                         }`}
                       >
                         {hasLogs && <CheckIcon className="w-3.5 h-3.5" />}
@@ -647,10 +660,10 @@ function MacroPulseClientApp() {
                 })}
               </div>
 
-              <div className="pl-3 border-l border-white/10 flex items-center justify-center">
-                <div className="relative flex items-center justify-center w-10 h-10 text-amber-300">
+              <div className="pl-3 border-l border-zinc-200 dark:border-white/10 flex items-center justify-center">
+                <div className="relative flex items-center justify-center w-10 h-10 text-amber-500 dark:text-amber-300">
                   <FlameIcon className="w-9 h-9" />
-                  <span className="absolute mt-1.5 text-[11px] font-bold text-[#0f131d]">
+                  <span className="absolute mt-1.5 text-[11px] font-bold text-white dark:text-[#0f131d]">
                     {streakCount}
                   </span>
                 </div>
@@ -659,24 +672,30 @@ function MacroPulseClientApp() {
 
             {/* Calories Card */}
             <section className={`rounded-2xl border p-4 space-y-3 ${cardSurface}`}>
-              <p className="text-sm font-medium text-zinc-300">Calories</p>
+              <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">Calories</p>
               <div className="flex items-baseline justify-between gap-2 flex-wrap">
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-2xl font-bold tracking-tight">
                     {dayTotals.kcal.toLocaleString("fr-FR")} cal
                   </span>
-                  <span className="text-sm text-zinc-400">
+                  <span className="text-sm text-zinc-500 dark:text-zinc-400">
                     / {state.goals.targetKcal.toLocaleString("fr-FR")}
                   </span>
                   <span className="text-sm" aria-hidden="true">🔥</span>
                 </div>
-                <span className={`text-sm font-semibold ${kcalRemaining < 0 ? "text-rose-400" : "text-zinc-200"}`}>
+                <span
+                  className={`text-sm font-semibold ${
+                    kcalRemaining < 0
+                      ? "text-rose-600 dark:text-rose-400"
+                      : "text-zinc-700 dark:text-zinc-200"
+                  }`}
+                >
                   {kcalRemaining >= 0
                     ? `${kcalRemaining.toLocaleString("fr-FR")} restants`
                     : `${Math.abs(kcalRemaining).toLocaleString("fr-FR")} dépassés`}
                 </span>
               </div>
-              <div className="h-2.5 rounded-full bg-[#242a3a] overflow-hidden">
+              <div className="h-2.5 rounded-full bg-[var(--track)] overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${
                     kcalRemaining < 0
@@ -693,10 +712,13 @@ function MacroPulseClientApp() {
               <button
                 type="button"
                 onClick={() => setShowMicronutrients((v) => !v)}
-                className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-300 transition"
+                className="absolute top-1.5 right-1.5 w-11 h-11 rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 flex items-center justify-center text-zinc-600 dark:text-zinc-300 transition"
                 title={showMicronutrients ? "Voir les macros" : "Voir les micronutriments épinglés"}
+                aria-label={showMicronutrients ? "Voir les macros" : "Voir les micronutriments épinglés"}
               >
-                <SwapIcon className="w-3.5 h-3.5" />
+                <span className="w-7 h-7 rounded-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center">
+                  <SwapIcon className="w-3.5 h-3.5" />
+                </span>
               </button>
 
               {!showMicronutrients ? (
@@ -724,12 +746,12 @@ function MacroPulseClientApp() {
                     const pct = Math.min(100, Math.round((m.val / Math.max(1, m.target)) * 100));
                     return (
                       <div key={m.label} className="space-y-1.5">
-                        <p className="text-xs text-zinc-400">{m.label}</p>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">{m.label}</p>
                         <p className="text-base font-bold leading-tight">
                           {Math.round(m.val)} g{" "}
-                          <span className="text-xs font-normal text-zinc-400">/ {m.target}</span>
+                          <span className="text-xs font-normal text-zinc-500 dark:text-zinc-400">/ {m.target}</span>
                         </p>
-                        <div className="h-2 rounded-full bg-[#242a3a] overflow-hidden">
+                        <div className="h-2 rounded-full bg-[var(--track)] overflow-hidden">
                           <div className={`h-full rounded-full ${m.bar}`} style={{ width: `${pct}%` }} />
                         </div>
                       </div>
@@ -738,7 +760,7 @@ function MacroPulseClientApp() {
                 </div>
               ) : (
                 <div className="space-y-2 pr-6">
-                  <p className="text-xs font-medium text-zinc-400">Micronutriments épinglés</p>
+                  <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Micronutriments épinglés</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {state.profile.pinnedMicronutrients.map((key) => {
                       const meta = MICRONUTRIENT_CATALOG.find((c) => c.key === key);
@@ -748,9 +770,9 @@ function MacroPulseClientApp() {
                       return (
                         <div
                           key={key}
-                          className="rounded-xl bg-white/[0.04] px-2.5 py-2 text-xs"
+                          className="rounded-xl bg-zinc-100 dark:bg-white/[0.04] px-2.5 py-2 text-xs"
                         >
-                          <div className="text-zinc-400 truncate">{meta.label}</div>
+                          <div className="text-zinc-600 dark:text-zinc-400 truncate">{meta.label}</div>
                           <div className="font-mono font-semibold mt-0.5">
                             {val} <span className="text-zinc-500 font-normal">/ {target}{meta.unit}</span>
                           </div>
@@ -769,7 +791,7 @@ function MacroPulseClientApp() {
                 <button
                   type="button"
                   onClick={() => setShowFullJournal((v) => !v)}
-                  className="text-sm font-semibold text-blue-400 hover:text-blue-300"
+                  className="min-h-11 px-2 inline-flex items-center text-sm font-semibold text-blue-400 hover:text-blue-300"
                 >
                   {showFullJournal ? "Vue résumée" : "Voir le journal"}
                 </button>
@@ -785,21 +807,22 @@ function MacroPulseClientApp() {
                     <div key={slot} className={`rounded-2xl border p-4 space-y-2.5 ${cardSurface}`}>
                       <div className="flex items-center justify-between gap-2">
                         <h3 className="text-base font-medium">{label}</h3>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <button
                             type="button"
                             onClick={() =>
                               setExpandedMeals((prev) => ({ ...prev, [slot]: !prev[slot] }))
                             }
-                            className="px-2 py-1 text-zinc-400 hover:text-zinc-200 text-sm tracking-widest"
+                            className="min-w-11 min-h-11 flex items-center justify-center text-zinc-400 hover:text-zinc-200 text-sm tracking-widest rounded-full"
                             title="Afficher / masquer le détail"
+                            aria-label={`Afficher ou masquer le détail de ${label}`}
                           >
                             •••
                           </button>
                           <button
                             type="button"
                             onClick={() => openQuickAdd("all", slot)}
-                            className="px-3.5 py-1.5 rounded-full bg-blue-500/15 hover:bg-blue-500/25 border border-blue-400/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] text-blue-400 text-xs font-semibold transition active:scale-[0.96]"
+                            className="min-h-11 px-4 rounded-full bg-blue-500/15 hover:bg-blue-500/25 border border-blue-400/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] text-blue-400 text-xs font-semibold transition active:scale-[0.96]"
                           >
                             Consignez
                           </button>
@@ -812,9 +835,9 @@ function MacroPulseClientApp() {
                           <button
                             type="button"
                             onClick={() => handleDuplicateYesterday(slot)}
-                            className="inline-flex items-center gap-1 text-[11px] text-blue-400 hover:underline"
+                            className="min-h-11 px-2 inline-flex items-center gap-1 text-xs text-blue-400 hover:underline"
                           >
-                            <CopyIcon className="w-3 h-3" /> Copier hier
+                            <CopyIcon className="w-3.5 h-3.5" /> Copier hier
                           </button>
                         </div>
                       ) : !isExpanded ? (
@@ -832,7 +855,7 @@ function MacroPulseClientApp() {
                             {items[0].foodName}
                             {items.length > 1 ? ` et ${items.length - 1} de plus` : ""}
                           </p>
-                          <p>{slotKcal} cal</p>
+                          <p>{slotKcal.toLocaleString("fr-FR")} cal</p>
                         </div>
                       ) : (
                         <div className="divide-y divide-white/[0.06] pt-1 border-t border-white/[0.05]">
@@ -846,15 +869,15 @@ function MacroPulseClientApp() {
                                 <p className="font-medium text-zinc-200 truncate">{item.foodName}</p>
                                 <p className="text-[11px] text-zinc-400">
                                   {item.unitQuantity
-                                    ? `${item.unitQuantity} ${item.unitLabel || "unité"} (${item.quantityG} g)`
-                                    : `${item.quantityG} g`}{" "}
-                                  · P {item.nutrients.proteinG}g · G{" "}
-                                  {item.nutrients.carbsG}g · L {item.nutrients.fatG}g
+                                    ? `${formatFrNumber(item.unitQuantity)} ${item.unitLabel || "unité"} (${formatFrNumber(item.quantityG)} g)`
+                                    : `${formatFrNumber(item.quantityG)} g`}{" "}
+                                  · P {formatFrNumber(item.nutrients.proteinG)}g · G{" "}
+                                  {formatFrNumber(item.nutrients.carbsG)}g · L {formatFrNumber(item.nutrients.fatG)}g
                                 </p>
                               </div>
-                              <div className="flex items-center gap-2 shrink-0">
+                              <div className="flex items-center gap-1 shrink-0">
                                 <span className="font-mono text-blue-400 font-semibold">
-                                  {item.nutrients.kcal} cal
+                                  {item.nutrients.kcal.toLocaleString("fr-FR")} cal
                                 </span>
                                 <button
                                   type="button"
@@ -862,8 +885,9 @@ function MacroPulseClientApp() {
                                     e.stopPropagation();
                                     handleDeleteFoodLog(item.id);
                                   }}
-                                  className="text-zinc-500 hover:text-rose-400 p-1"
+                                  className="min-w-11 min-h-11 flex items-center justify-center text-zinc-500 hover:text-rose-400 rounded-full"
                                   title="Supprimer"
+                                  aria-label={`Supprimer ${item.foodName}`}
                                 >
                                   <TrashIcon />
                                 </button>
@@ -877,11 +901,11 @@ function MacroPulseClientApp() {
                 })}
               </div>
 
-              <div className="flex items-center justify-center gap-4 pt-1">
+              <div className="flex items-center justify-center gap-3 pt-1">
                 <button
                   type="button"
                   onClick={() => setShowFullJournal((v) => !v)}
-                  className="text-sm font-semibold text-blue-400 hover:text-blue-300"
+                  className="min-h-11 px-2 inline-flex items-center text-sm font-semibold text-blue-400 hover:text-blue-300"
                 >
                   {showFullJournal ? "Réduire le journal" : "Journal complet"}
                 </button>
@@ -889,7 +913,7 @@ function MacroPulseClientApp() {
                 <button
                   type="button"
                   onClick={() => handleDuplicateYesterday()}
-                  className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200"
+                  className="min-h-11 px-2 inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200"
                 >
                   <CopyIcon className="w-3.5 h-3.5" /> Dupliquer hier
                 </button>
@@ -905,7 +929,7 @@ function MacroPulseClientApp() {
                   <div>
                     <p className="text-sm font-semibold">Eau</p>
                     <p className="text-xs text-zinc-400 mt-0.5">
-                      {dayWaterMl} ml / {state.goals.targetWaterMl} ml
+                      {dayWaterMl.toLocaleString("fr-FR")} ml / {state.goals.targetWaterMl.toLocaleString("fr-FR")} ml
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -914,7 +938,7 @@ function MacroPulseClientApp() {
                         key={ml}
                         type="button"
                         onClick={() => handleAddWater(ml)}
-                        className="px-2.5 py-1 rounded-full bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 text-xs font-semibold"
+                        className="min-h-11 px-3.5 rounded-full bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 text-xs font-semibold"
                       >
                         +{ml} ml
                       </button>
@@ -927,25 +951,25 @@ function MacroPulseClientApp() {
                   <button
                     type="button"
                     onClick={() => setActiveTab("analytics")}
-                    className="text-left flex-1"
+                    className="min-h-11 text-left flex-1 flex flex-col justify-center"
                   >
                     <p className="text-sm font-semibold">Pas</p>
                     <p className="text-xs text-zinc-400 mt-0.5">
                       {daySteps.toLocaleString("fr-FR")} pas aujourd&apos;hui
                     </p>
                   </button>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => handleLogSteps(selectedDate, daySteps + 1000)}
-                      className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-xs font-medium text-zinc-300"
+                      className="min-h-11 px-3.5 rounded-full bg-white/5 hover:bg-white/10 text-xs font-medium text-zinc-300"
                     >
                       +1 000
                     </button>
                     <button
                       type="button"
                       onClick={() => setActiveTab("analytics")}
-                      className="text-zinc-400 hover:text-zinc-200 p-1"
+                      className="min-w-11 min-h-11 flex items-center justify-center text-zinc-400 hover:text-zinc-200 rounded-full"
                       aria-label="Voir les pas"
                     >
                       <ChevronRightIcon className="w-4 h-4" />
@@ -965,10 +989,11 @@ function MacroPulseClientApp() {
               >
                 <div>
                   <p className="text-xl font-bold">
-                    {weightTrends.latestWeight ? `${weightTrends.latestWeight} kg` : "—"}
+                    {weightTrends.latestWeight ? `${formatFrNumber(weightTrends.latestWeight)} kg` : "—"}
                   </p>
                   <p className="text-xs text-zinc-400 mt-0.5">
-                    3j : {weightTrends.ma3Latest ?? "—"} · 5j : {weightTrends.ma5Latest ?? "—"} ·{" "}
+                    3j : {weightTrends.ma3Latest !== null ? formatFrNumber(weightTrends.ma3Latest) : "—"} · 5j :{" "}
+                    {weightTrends.ma5Latest !== null ? formatFrNumber(weightTrends.ma5Latest) : "—"} ·{" "}
                     <span className="capitalize text-blue-400">{weightTrends.status3}</span>
                   </p>
                 </div>
@@ -1151,7 +1176,8 @@ function MacroPulseClientApp() {
               <button
                 type="button"
                 onClick={() => setAddSheetOpen(false)}
-                className="p-1 text-zinc-400 hover:text-zinc-200"
+                className="w-11 h-11 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+                aria-label="Fermer"
               >
                 <XIcon className="w-4 h-4" />
               </button>
@@ -1232,83 +1258,91 @@ function MacroPulseClientApp() {
         </div>
       )}
 
-      <QuickAddModal
-        open={quickAddOpen}
-        onClose={() => setQuickAddOpen(false)}
-        selectedDate={selectedDate}
-        foods={state.foods}
-        recipes={state.recipes}
-        foodLogs={state.foodLogs}
-        initialTab={quickAddTab}
-        initialMealSlot={quickAddSlot}
-        onAddFoodLogs={handleAddFoodLogs}
-        onSaveCustomFood={handleSaveCustomFood}
-        onUpdateCustomFood={handleUpdateCustomFood}
-        onSaveRecipe={handleSaveRecipe}
-        onDeleteRecipe={handleDeleteRecipe}
-      />
+      {quickAddOpen && (
+        <QuickAddModal
+          open={quickAddOpen}
+          onClose={() => setQuickAddOpen(false)}
+          selectedDate={selectedDate}
+          foods={state.foods}
+          recipes={state.recipes}
+          foodLogs={state.foodLogs}
+          initialTab={quickAddTab}
+          initialMealSlot={quickAddSlot}
+          onAddFoodLogs={handleAddFoodLogs}
+          onSaveCustomFood={handleSaveCustomFood}
+          onUpdateCustomFood={handleUpdateCustomFood}
+          onSaveRecipe={handleSaveRecipe}
+          onDeleteRecipe={handleDeleteRecipe}
+        />
+      )}
 
-      <ProfileMenuModal
-        open={profileMenuOpen}
-        onClose={() => setProfileMenuOpen(false)}
-        displayName={state.profile.displayName}
-        streakCount={streakCount}
-        weights={state.weights}
-        isDark={isDark}
-        onToggleTheme={() =>
-          setState((prev) => ({
-            ...prev,
-            profile: { ...prev.profile, theme: isDark ? "light" : "dark" },
-          }))
-        }
-        onNavigate={(tab) => setActiveTab(tab)}
-        onOpenFoods={() => openQuickAdd("foods")}
-        onExportJSON={() =>
-          downloadFile(
-            `macropulse-${todayISO()}.json`,
-            exportAppStateAsJSON(state),
-            "application/json"
-          )
-        }
-        onImportJSON={handleImportJSONFile}
-        onExportCSV={() =>
-          downloadFile(
-            `macropulse-repas-${todayISO()}.csv`,
-            exportFoodLogsAsCSV(state.foodLogs),
-            "text/csv"
-          )
-        }
-        onClearAllData={() =>
-          setState((prev) => ({
-            ...prev,
-            foods: [],
-            recipes: [],
-            foodLogs: [],
-            weights: [],
-            steps: [],
-            waterLogs: [],
-          }))
-        }
-      />
+      {profileMenuOpen && (
+        <ProfileMenuModal
+          open={profileMenuOpen}
+          onClose={() => setProfileMenuOpen(false)}
+          displayName={state.profile.displayName}
+          streakCount={streakCount}
+          weights={state.weights}
+          isDark={isDark}
+          onToggleTheme={() =>
+            setState((prev) => ({
+              ...prev,
+              profile: { ...prev.profile, theme: isDark ? "light" : "dark" },
+            }))
+          }
+          onNavigate={(tab) => setActiveTab(tab)}
+          onOpenFoods={() => openQuickAdd("foods")}
+          onExportJSON={() =>
+            downloadFile(
+              `macropulse-${todayISO()}.json`,
+              exportAppStateAsJSON(state),
+              "application/json"
+            )
+          }
+          onImportJSON={handleImportJSONFile}
+          onExportCSV={() =>
+            downloadFile(
+              `macropulse-repas-${todayISO()}.csv`,
+              exportFoodLogsAsCSV(state.foodLogs),
+              "text/csv"
+            )
+          }
+          onClearAllData={() =>
+            setState((prev) => ({
+              ...prev,
+              foods: [],
+              recipes: [],
+              foodLogs: [],
+              weights: [],
+              steps: [],
+              waterLogs: [],
+            }))
+          }
+        />
+      )}
 
-      <FoodLogDetailModal
-        entry={editingEntry}
-        recipes={state.recipes}
-        onClose={() => setEditingEntry(null)}
-        onSave={handleUpdateFoodLog}
-        onDelete={handleDeleteFoodLog}
-      />
+      {editingEntry && (
+        <FoodLogDetailModal
+          entry={editingEntry}
+          recipes={state.recipes}
+          onClose={() => setEditingEntry(null)}
+          onSave={handleUpdateFoodLog}
+          onDelete={handleDeleteFoodLog}
+        />
+      )}
 
-      <MacroOptimizerModal
-        open={optimizerOpen}
-        onClose={() => setOptimizerOpen(false)}
-        selectedDate={selectedDate}
-        goals={state.goals}
-        dayTotals={dayTotals}
-        foods={state.foods}
-        recipes={state.recipes}
-        onApplyLogs={handleAddFoodLogs}
-      />
+      {optimizerOpen && (
+        <MacroOptimizerModal
+          open={optimizerOpen}
+          onClose={() => setOptimizerOpen(false)}
+          selectedDate={selectedDate}
+          goals={state.goals}
+          dayTotals={dayTotals}
+          foods={state.foods}
+          recipes={state.recipes}
+          onApplyLogs={handleAddFoodLogs}
+        />
+      )}
     </div>
   );
 }
